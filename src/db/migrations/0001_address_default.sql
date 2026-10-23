@@ -1,0 +1,1 @@
+ALTER TABLE "customer_addresses" ADD COLUMN "is_default" boolean DEFAULT false NOT NULL;

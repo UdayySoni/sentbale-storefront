@@ -1,0 +1,101 @@
+/* Calm motion, generous typography, and tactile controls. */
+:root{--ease-luxury:cubic-bezier(.22,1,.36,1)}
+body{font-size:14px;-webkit-font-smoothing:antialiased}
+.header{height:104px}
+.header nav>a{font-size:13px;letter-spacing:.065em;padding:16px 0}
+.header .wordmark{font-size:32px;letter-spacing:6px}
+.wordmark>span{font-size:8px;letter-spacing:4px}
+.announcement{font-size:11px;min-height:33px}
+.icon-button{min-width:44px;min-height:44px}
+.button{font-size:11px;letter-spacing:.1em;min-height:52px;transition:background-color .3s ease,color .3s ease,transform .45s var(--ease-luxury),box-shadow .45s ease}
+.button:hover{transform:translateY(-2px);box-shadow:0 8px 24px #24251f12}
+.button:active{transform:translateY(0)}
+.button:disabled{opacity:.6;cursor:wait;transform:none}
+.eyebrow{font-size:10px;letter-spacing:.2em}
+.text-link{font-size:12px}
+.hero-copy>p:not(.eyebrow){font-size:14px;line-height:1.85}
+.product-family{font-size:10px;letter-spacing:.12em}
+.product-mood{font-size:11px;line-height:1.7}
+.product-price{font-size:14px}
+.product-price>small{font-size:10px}
+.product-meta h3{font-size:36px}
+.product-badge{font-size:9px;letter-spacing:.08em}
+.quick-add{font-size:11px;min-height:44px;transition:transform .5s var(--ease-luxury),background .3s ease}
+.photo{transition:transform 1.1s var(--ease-luxury),filter .6s ease}
+.collection-card:hover .photo,.journal-card:hover .photo,.product-card:hover .photo{transform:scale(1.035)}
+.wish-button{width:38px;height:38px;transition:background .25s ease,transform .35s var(--ease-luxury)}
+.wish-button:hover{transform:scale(1.08)}
+.story-copy>p:not(.eyebrow),.journal-card>p:not(.eyebrow),.detail-description,.story-intro>p:not(.eyebrow){font-size:14px;line-height:1.9}
+.footer-top p:not(.eyebrow),.footer-brand>p{font-size:13px;line-height:1.9}
+.footer-main h3{font-size:11px;letter-spacing:.15em;margin-bottom:22px}
+.footer-main>div:not(.footer-brand)>a{font-size:13px;line-height:2.8}
+.footer-brand>.wordmark{font-size:38px;letter-spacing:7px}
+.footer-bottom,.footer-bottom>span:last-child{font-size:10px;line-height:1.8}
+.newsletter input{font-size:14px;min-height:48px}
+.newsletter small{font-size:11px;line-height:1.8}
+.preview-ribbon{font-size:9px;line-height:1.7;letter-spacing:.04em}
+.field{font-size:12px;line-height:1.8}
+.field input,.field select,.field textarea{font-size:15px;min-height:50px;border-radius:0;transition:border-color .25s ease,box-shadow .25s ease}
+.field input:focus,.field textarea:focus,.field select:focus{outline:0;border-color:#8c7754;box-shadow:0 0 0 3px #a58e6020}
+.form-message{font-size:13px;line-height:1.8}
+.auth-form .field{margin:20px 0}
+.auth-form h2{font-size:clamp(40px,4vw,62px);line-height:1.05}
+.auth-form>.muted,.account-page>.muted{font-size:14px;line-height:1.8}
+.auth-toggle button{font-size:13px;min-height:48px}
+.password-input{position:relative;display:block}
+.password-input input{padding-right:52px;width:100%}
+.password-input button{position:absolute;right:2px;bottom:2px;width:46px;height:46px;display:grid;place-items:center;background:transparent;border:0;color:#776b55}
+.field-hint,.account-disclaimer{font-size:12px;color:#756d5d;line-height:1.8}
+.account-disclaimer{margin-top:24px;max-width:440px}
+.account-layout>nav>a,.account-layout>nav>button{font-size:13px;min-height:48px}
+.account-stats{gap:20px}
+.account-stats>div{background:linear-gradient(135deg,#eee8da,#f4f0e7);border:1px solid #ddd4c2}
+.account-stats span{font-size:12px}
+.order-list>div{gap:20px}
+.order-list>div>div{min-width:0;flex:1}
+.order-detail-link{font-size:12px;overflow-wrap:anywhere;line-height:1.7}
+.order-list strong{font-size:13px}
+.status-pill{font-size:10px;white-space:nowrap}
+.order-summary{background:linear-gradient(145deg,#f0ebdf,#eae3d4);border:1px solid #dcd2bf;padding:32px}
+.cart-layout>.order-summary,.checkout-layout>.order-summary{position:sticky;top:28px;align-self:start}
+.summary-row{font-size:14px;padding:16px 0}
+.summary-row.total{font-size:17px;margin-bottom:20px}
+.checkout-note,.demo-notice{font-size:12px;line-height:1.8}
+.cart-line{padding:28px 0;gap:22px}
+.cart-line-copy p{font-size:11px;line-height:1.7}
+.cart-line-price{font-size:14px}
+.cart-line-copy h3{font-size:34px}
+.save-later{display:flex;align-items:center;gap:6px;background:none;border:0;padding:10px 0;color:#73664f;font-size:11px;text-decoration:underline;text-underline-offset:4px}
+.cart-line-copy .quantity{margin-top:4px}
+.cart-edit-note{margin:20px 0;font-size:13px;color:#7a705f;line-height:1.8}
+.cart-recommendations{margin-top:75px;padding-top:45px;border-top:1px solid var(--line)}
+.cart-recommendations h2{font-size:42px;margin-bottom:25px}
+.bag-pairings{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}
+.bag-pairing{display:flex;align-items:center;gap:16px;padding:16px;background:#eee8dc;border:1px solid #e1d8c7}
+.bag-pairing .cart-thumb{width:70px;height:90px;flex-shrink:0}
+.bag-pairing h3{font-size:28px}
+.bag-pairing p{font-size:12px;margin:8px 0}
+.bag-pairing .text-link{font-size:11px}
+.modal[open]{animation:modal-arrive .4s var(--ease-luxury) both}
+.modal[open]::backdrop{animation:veil-arrive .4s ease both;backdrop-filter:blur(5px)}
+.drawer[open]{animation:drawer-arrive .55s var(--ease-luxury) both}
+@keyframes modal-arrive{from{opacity:0;transform:translateY(18px) scale(.98)}to{opacity:1;transform:none}}
+@keyframes drawer-arrive{from{opacity:.4;transform:translateX(100%)}to{opacity:1;transform:none}}
+@keyframes veil-arrive{from{opacity:0}to{opacity:1}}
+@media(min-width:701px){.section{padding-top:75px;padding-bottom:75px}.header nav{gap:28px}.cart-page{min-height:65vh}}
+@media(max-width:1000px) and (min-width:701px){.header .wordmark{font-size:25px;letter-spacing:3px}.header nav{gap:15px}.header nav>a{font-size:12px}.bag-pairings{grid-template-columns:1fr 1fr}}
+@media(max-width:700px){
+ .header{height:82px}.header .wordmark{font-size:26px;letter-spacing:4px}.announcement{font-size:9px;min-height:30px}
+ .header-actions .icon-button{min-width:36px;min-height:44px}.hero-copy{padding-top:174px}.hero-copy>p:not(.eyebrow){font-size:13px}
+ .button{font-size:10px;min-height:50px}.product-meta h3{font-size:30px}.product-family{font-size:8px}.product-mood{font-size:10px}.product-price{font-size:12px}.product-price>small{font-size:9px}.product-badge{font-size:7px;max-width:calc(100% - 50px)}
+ .quick-add{font-size:10px;padding:10px;gap:5px}.wish-button{width:34px;height:34px}.collection-caption>p{font-size:9px}.collection-caption>h3{font-size:34px}
+ .footer-main>div:not(.footer-brand)>a{font-size:13px;line-height:3}.footer-main h3{font-size:10px}.footer-bottom{font-size:10px}.footer-top p:not(.eyebrow){font-size:13px}
+ .footer-brand>.wordmark{font-size:34px;letter-spacing:5px}.newsletter small{font-size:10px}.preview-ribbon{font-size:8px}
+ .field input,.field select,.field textarea{font-size:16px}.auth-form h2{font-size:46px}.account-layout>nav>a,.account-layout>nav>button{font-size:12px;padding:12px}
+ .account-stats>div{padding:18px;gap:10px}.account-stats span{font-size:11px}.order-list>div{gap:13px}.order-list .status-pill{font-size:9px}.order-summary{padding:24px}
+ .cart-layout>.order-summary,.checkout-layout>.order-summary{position:static}.cart-line{gap:12px}.cart-line-copy h3{font-size:29px}.cart-line-price{font-size:12px}.cart-thumb{width:72px;height:100px}.cart-line-copy p{font-size:10px}.save-later{font-size:10px;min-height:36px}
+ .cart-line-price .icon-button{min-width:40px}.bag-pairings{grid-template-columns:1fr}.cart-recommendations{margin-top:45px}.cart-recommendations h2{font-size:35px}.bag-pairing{padding:14px}.demo-notice{font-size:11px}
+ .shipping-options small{font-size:10px}.checkout-item p{font-size:11px}.checkout-item>strong{font-size:12px}.detail-description,.tab-content{font-size:14px}.detail-tabs>button{font-size:12px}.detail-buy>.button{font-size:10px}.account-content{min-width:0}
+}
+@media(max-width:370px){.header .wordmark{font-size:21px;letter-spacing:3px}.hero h1{font-size:57px}.cart-thumb{width:60px;height:85px}.cart-line{gap:9px}.cart-line-price{font-size:11px}.product-meta h3{font-size:26px}.product-family{font-size:7px}.detail-buy>.button{font-size:9px;gap:6px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}

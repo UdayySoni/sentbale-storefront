@@ -1,0 +1,17 @@
+node_modules/
+.next/
+.tools/
+.env*
+!.env.example
+test-results/
+playwright-report/
+*.log
+*.tsbuildinfo
+.preview/
+data/media/
+data/media.json
+data/*.tmp
+data/*.sqlite*
+data/catalog.json
+data/postgres/
+data-backup-*/

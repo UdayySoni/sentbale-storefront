@@ -1,0 +1,14 @@
+node_modules
+.next
+.tools
+.preview
+data
+data-backup-*
+test-results
+playwright-report
+tests
+.env
+.env.*
+!.env.example
+*.log
+*.tsbuildinfo
