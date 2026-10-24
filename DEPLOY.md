@@ -20,7 +20,7 @@ All settings are environment variables; `.env.example` describes each one.
 | `RESEND_API_KEY`, `MAIL_FROM` | For email | Order confirmations, store alerts, team invitations, password resets |
 | `ADMIN_SETUP_CODE` | Production, first start | Secret the owner set-up form asks for |
 | `SITE_INDEXABLE=true` | At launch | Lets search engines index the store and serves `/robots.txt` and `/sitemap.xml` for them (until then, `robots.txt` blocks all crawlers) |
-| `PAYMENTS_ALLOW_TEST=true` | Staging only | Keeps the no-money test checkout available alongside Razorpay |
+| `PAYMENTS_ALLOW_TEST=true` | Staging only | Turns on the no-money test checkout (orders are marked Paid). Off in production unless set; never set it on the live store. |
 
 ## Option A — Docker (one server)
 

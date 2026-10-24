@@ -1,7 +1,7 @@
 import 'server-only';
 import { randomBytes, randomUUID, createHash, scryptSync, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
-import { and, asc, eq, gt, isNull, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, gt, lt, sql } from 'drizzle-orm';
 import { db, schema as s } from '@/db';
 import { secureCookies } from './request-security';
 
@@ -56,12 +56,6 @@ export async function createCustomer(name: string, email: string, password: stri
   const id = randomUUID();
   await (await db()).insert(s.customers).values({ id, name, email, passwordHash: passwordHash(password) });
   return id;
-}
-
-/** Sets the password of a customer the admin added, so they can sign in from now on. */
-export async function claimCustomer(id: string, name: string, password: string) {
-  const [row] = await (await db()).update(s.customers).set({ name, passwordHash: passwordHash(password) }).where(and(eq(s.customers.id, id), isNull(s.customers.passwordHash))).returning({ id: s.customers.id });
-  return !!row;
 }
 
 export async function renameCustomer(id: string, name: string) {

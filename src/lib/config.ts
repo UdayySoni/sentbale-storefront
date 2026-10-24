@@ -39,8 +39,11 @@ export const config = {
 };
 
 export const razorpayEnabled = () => !!(config.payments.razorpayKeyId && config.payments.razorpayKeySecret);
-/** The test checkout is available locally, or when Razorpay is not set up, or when explicitly allowed. */
-export const testPaymentsEnabled = () => !razorpayEnabled() || config.payments.allowTest;
+/**
+ * The test checkout (orders marked Paid, no money taken). Locally it is on while Razorpay is not set up;
+ * in production only when PAYMENTS_ALLOW_TEST=true, so a live store without Razorpay keys never gives orders away.
+ */
+export const testPaymentsEnabled = () => config.payments.allowTest || (!config.production && !razorpayEnabled());
 export const mailEnabled = () => !!(config.mail.resendApiKey && config.mail.from);
 
 /** Problems that make a production deployment unsafe or broken. */
@@ -64,6 +67,9 @@ export function configProblems() {
  * exits (Next.js only logs a throwing instrumentation hook and serves anyway). Locally it just warns.
  */
 export function checkConfigOrExit() {
+  if (config.production && !razorpayEnabled()) console.warn(config.payments.allowTest
+    ? 'SENTBALE: PAYMENTS_ALLOW_TEST is on — anyone can place orders that are marked Paid without paying. Use this only on a staging site.'
+    : 'SENTBALE: Razorpay is not configured, so customers can only order with cash on delivery (if it is enabled in Admin → Payments).');
   const problems = configProblems();
   if (!problems.length) return;
   const message = `SENTBALE configuration:\n- ${problems.join('\n- ')}`;

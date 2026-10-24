@@ -1,4 +1,4 @@
-import { attemptsExceeded, claimCustomer, clearAttempts, createCustomer, createSession, currentUser, endSession, findCustomerByEmail, listAddresses, passwordMatches, recordAttempt, renameCustomer, replaceAddresses, type Address } from '@/lib/accounts-server';
+import { attemptsExceeded, clearAttempts, createCustomer, createSession, currentUser, endSession, findCustomerByEmail, listAddresses, passwordMatches, recordAttempt, renameCustomer, replaceAddresses, type Address } from '@/lib/accounts-server';
 import { listOrders } from '@/lib/orders-server';
 import { completeReset, requestReset } from '@/lib/password-reset-server';
 import { writeAllowed } from '@/lib/request-security';
@@ -49,9 +49,10 @@ export async function POST(request: Request) {
       if(user?.passwordHash) return reply({error:'An account already uses this email. Please sign in.'},409);
       if(typeof body.name!=='string'||!body.name.trim()||body.name.length>100) return reply({error:'Enter your name.'},400);
       if(user?.status==='Blocked') return reply({error:'This account is not available. Please contact us.'},403);
-      // A customer added in the admin has no password yet; registering with that email claims the record.
-      if(user) { if(!(await claimCustomer(user.id,body.name.trim(),password))) return reply({error:'An account already uses this email. Please sign in.'},409); id=user.id; }
-      else id=await createCustomer(body.name.trim(),email,password);
+      // A customer added in the admin has no password yet. Their record (and any orders on it) is claimed
+      // through an emailed link, so only the owner of the inbox can take it over.
+      if(user) { await requestReset('customer',email); return reply({error:'We already have your details. We’ve emailed you a link to set your password.'},409); }
+      id=await createCustomer(body.name.trim(),email,password);
     } else if(!user || !user.passwordHash || user.status!=='Active' || !passwordMatches(password,user.passwordHash)) return reply({error:'Email or password is incorrect.'},401);
     else id=user.id;
     await createSession(id); await clearAttempts(email);

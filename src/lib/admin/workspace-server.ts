@@ -339,6 +339,7 @@ export async function applyChanges(admin: Admin, changes: Changes) {
  * Only allowed before the server workspace has been written to; invalid rows are skipped, not fatal.
  */
 export async function importWorkspace(admin: Admin, data: Partial<Db>) {
+  if (!isOwner(admin)) throw new WorkspaceError('Only an Owner can import a workspace.');
   return (await db()).transaction(async tx => {
     const [claimed] = await tx.insert(s.meta).values({ key: CLAIMED, value: new Date().toISOString() }).onConflictDoNothing().returning();
     if (!claimed) return null;

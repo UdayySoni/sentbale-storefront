@@ -1,6 +1,6 @@
 import 'server-only';
 import { randomBytes } from 'node:crypto';
-import { and, eq, gt, isNotNull } from 'drizzle-orm';
+import { and, eq, gt } from 'drizzle-orm';
 import { db, schema as s } from '@/db';
 import { attemptsExceeded, digest, passwordHash, recordAttempt } from './accounts-server';
 import { config, mailEnabled } from './config';
@@ -18,8 +18,9 @@ export async function requestReset(kind: Kind, email: string) {
   if (await attemptsExceeded(key, 5)) return;
   await recordAttempt(key, LINK_MS);
   const database = await db();
+  // Customers the admin added have no password yet; this link is also how they set their first one.
   const [account] = kind === 'customer'
-    ? await database.select({ id: s.customers.id, name: s.customers.name }).from(s.customers).where(and(eq(s.customers.email, email), eq(s.customers.status, 'Active'), isNotNull(s.customers.passwordHash)))
+    ? await database.select({ id: s.customers.id, name: s.customers.name }).from(s.customers).where(and(eq(s.customers.email, email), eq(s.customers.status, 'Active')))
     : await database.select({ id: s.admins.id, name: s.admins.name }).from(s.admins).where(and(eq(s.admins.email, email), eq(s.admins.status, 'Active')));
   if (!account) return;
   const token = randomBytes(32).toString('hex');
