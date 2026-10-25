@@ -222,11 +222,13 @@ export async function updateOrderIn(tx: Tx, orderId: string, patch: OrderPatch) 
 export async function markPaid(orderId: string, paymentId: string) {
   const result = await updateOrder(orderId, { paymentStatus: 'Paid', paymentId });
   if (!result) return null;
+  let order = result.after;
   if (result.before.paymentStatus !== 'Paid') {
-    if (['Pending payment', 'Cancelled'].includes(result.before.status)) await updateOrder(orderId, { status: 'Processing' });
+    // The shopper's confirmation screen shows the returned order, so it must carry the new status.
+    if (['Pending payment', 'Cancelled'].includes(result.before.status)) order = (await updateOrder(orderId, { status: 'Processing' }))?.after ?? order;
     await announceOrder(orderId);
   }
-  return result.after;
+  return order;
 }
 
 // ---- Notifications --------------------------------------------------------------------------
