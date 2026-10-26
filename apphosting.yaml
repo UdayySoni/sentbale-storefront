@@ -31,3 +31,9 @@ env:
     secret: resendApiKey
   - variable: MAIL_FROM
     value: SENTBALE <orders@sentbaleperfumes.com>
+  - variable: RAZORPAY_KEY_ID
+    secret: razorpayKeyId
+  - variable: RAZORPAY_KEY_SECRET
+    secret: razorpayKeySecret
+  - variable: RAZORPAY_WEBHOOK_SECRET
+    secret: razorpayWebhookSecret
