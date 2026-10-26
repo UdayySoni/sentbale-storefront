@@ -6,7 +6,7 @@ import { readContent } from '@/lib/content-server';
 // Built from the live catalogue and content, so new products and posts appear without a redeploy.
 export const dynamic = 'force-dynamic';
 
-const pages = ['', 'shop', 'collections', 'journal', 'our-story', 'contact', 'faq', 'shipping', 'returns', 'privacy'];
+const pages = ['', 'shop', 'collections', 'journal', 'our-story', 'contact', 'faq', 'shipping', 'returns', 'privacy', 'terms'];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [{ products }, content] = await Promise.all([readCatalog(), readContent()]);

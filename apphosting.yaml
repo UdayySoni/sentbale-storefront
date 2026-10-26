@@ -25,3 +25,8 @@ env:
     secret: databaseUrl
   - variable: ADMIN_SETUP_CODE
     secret: adminSetupCode
+  # Email through Resend. The sending domain must be verified at resend.com/domains.
+  - variable: RESEND_API_KEY
+    secret: resendApiKey
+  - variable: MAIL_FROM
+    value: SENTBALE <orders@sentbaleperfumes.com>

@@ -9,7 +9,7 @@ const pages: Record<string, string> = {
   shop: 'All fragrances', collections: 'The collections', cart: 'Your bag', checkout: 'Checkout',
   account: 'My SENTBALE', 'account/orders': 'Your orders', 'account/wishlist': 'Your favourites',
   'account/profile': 'Your profile', 'our-story': 'Our story', journal: 'The journal', contact: 'Get in touch',
-  shipping: 'Shipping & delivery', returns: 'Returns & care', privacy: 'Your privacy', faq: 'Fragrance FAQ', 'account/addresses': 'Your address book', 'account/reset': 'Reset your password',
+  shipping: 'Shipping & delivery', returns: 'Returns & care', privacy: 'Your privacy', terms: 'Terms & conditions', faq: 'Fragrance FAQ', 'account/addresses': 'Your address book', 'account/reset': 'Reset your password',
 };
 /** Page titles, looked up in the live catalogue and content so new products and posts have pages. */
 async function titleFor(path: string): Promise<string | undefined> {
