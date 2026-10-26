@@ -17,6 +17,9 @@ const adminHeaders = [
 
 const config: NextConfig = {
   poweredByHeader: false,
+  // The database migrations are read from disk at the first connection; bundled hosts (Firebase App Hosting,
+  // standalone output) only ship files the build traces, so name them here.
+  outputFileTracingIncludes: { '/**': ['./src/db/migrations/**/*'] },
   devIndicators: false,
   // The source artwork is ~2 MB per PNG; keep optimized variants cached for a month.
   images: { minimumCacheTTL: 2678400 },

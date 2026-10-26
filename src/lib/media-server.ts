@@ -1,27 +1,23 @@
 import 'server-only';
-import { readdir, access } from 'node:fs/promises';
-import path from 'node:path';
 import { eq } from 'drizzle-orm';
 import { db, schema as s } from '@/db';
 import { bumpRevision } from './catalog-server';
-import { config } from './config';
 import { recordAudit } from './audit-server';
 import { defaultMedia, type MediaManifest, type MediaValue, mediaSlots, isAllowedMediaSource } from './media';
+import { listUploadNames, uploadExists } from './media-store';
 
-export const mediaDirectory = config.mediaDir;
 export async function readMedia(): Promise<MediaManifest> {
   const database = await db();
   const [rows, [revision]] = await Promise.all([database.select().from(s.mediaSlots), database.select().from(s.meta).where(eq(s.meta.key, 'media_revision'))]);
   return { revision: revision?.value ?? '0', images: { ...defaultMedia.images, ...Object.fromEntries(rows.map(({ slot, src, alt, position }) => [slot, { src, alt, position }])) } };
 }
 export async function listUploads() {
-  try { return (await readdir(mediaDirectory)).filter(name => /^[a-f0-9-]{36}\.(png|jpg|webp)$/.test(name)).map(name => ({ name, src: `/api/media/files/${name}` })); }
-  catch (e) { if ((e as NodeJS.ErrnoException).code === 'ENOENT') return []; throw e; }
+  return (await listUploadNames()).map(name => ({ name, src: `/api/media/files/${name}` }));
 }
 // Rejects stale admin tabs: the save applies only if the revision is still the one the tab loaded.
 export async function saveMedia(revision: string, images: Record<string, MediaValue>, actor: string): Promise<MediaManifest | null> {
   for (const value of Object.values(images)) {
-    if (value.src.startsWith('/api/media/files/')) await access(path.join(mediaDirectory, path.basename(value.src)));
+    if (value.src.startsWith('/api/media/files/') && !(await uploadExists(value.src.slice('/api/media/files/'.length)))) throw new Error(`Upload not found: ${value.src}`);
   }
   const updated = await (await db()).transaction(async tx => {
     const next = await bumpRevision(tx, 'media_revision', revision);

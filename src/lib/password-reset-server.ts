@@ -31,7 +31,7 @@ export async function requestReset(kind: Kind, email: string) {
   const link = `${config.siteUrl}/${kind === 'customer' ? 'account' : 'admin'}/reset?token=${token}`;
   // Without a mail provider in development, the link is printed so the flow can still be used.
   if (!mailEnabled() && !config.production) console.info(`[password reset] ${email}: ${link}`);
-  queueMail({ to: email, subject: kind === 'customer' ? 'Reset your SENTBALE password' : 'Reset your SENTBALE Admin password', body: `Hello ${account.name.split(' ')[0]},\n\nUse this link within an hour to choose a new password:\n${link}\n\nIf you did not ask for this, you can ignore this email; your password stays the same.` });
+  await queueMail({ to: email, subject: kind === 'customer' ? 'Reset your SENTBALE password' : 'Reset your SENTBALE Admin password', body: `Hello ${account.name.split(' ')[0]},\n\nUse this link within an hour to choose a new password:\n${link}\n\nIf you did not ask for this, you can ignore this email; your password stays the same.` });
 }
 
 /** Sets the new password and signs the account out everywhere. Returns the account id, or null if the link is invalid. */

@@ -23,6 +23,8 @@ export const config = {
   indexable: env('SITE_INDEXABLE') === 'true',
   // The image folder is chosen at runtime; it holds uploads, not code, so the build must not trace it.
   mediaDir: env('MEDIA_DIR') ? path.resolve(/*turbopackIgnore: true*/ env('MEDIA_DIR')) : path.join(/*turbopackIgnore: true*/ process.cwd(), 'data', 'media'),
+  /** Cloud Storage bucket for uploaded images (e.g. my-project.firebasestorage.app). When set, MEDIA_DIR is not used. */
+  mediaBucket: env('MEDIA_BUCKET'),
   payments: {
     razorpayKeyId: env('RAZORPAY_KEY_ID'),
     razorpayKeySecret: env('RAZORPAY_KEY_SECRET'),

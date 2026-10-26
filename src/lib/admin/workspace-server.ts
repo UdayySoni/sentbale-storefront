@@ -9,7 +9,7 @@ import { recordAudit } from '@/lib/audit-server';
 import { products as builtInProducts, sizes } from '@/lib/catalog';
 import { updateOrderIn, type OrderStatus, type PaymentStatus } from '@/lib/commerce-server';
 import { config } from '@/lib/config';
-import { queueMail } from '@/lib/mail-server';
+import { queueMail, type Mail } from '@/lib/mail-server';
 import { isAllowedMediaSource } from '@/lib/media';
 import { setting } from '@/lib/records-server';
 import { accessFor, allows, isOwner, type AccessMap } from './access-server';
@@ -231,14 +231,14 @@ async function activeOwners(tx: Tx, except?: string) {
   return total;
 }
 
-async function inviteMail(tx: Tx, adminId: string, name: string, address: string, role: string, by: string) {
+async function inviteMail(tx: Tx, adminId: string, name: string, address: string, role: string, by: string, outbox: Mail[]) {
   const token = await issueInvite(tx, adminId);
   const link = `${config.siteUrl}/admin/invite?token=${token}`;
-  queueMail({ to: address, subject: 'You are invited to SENTBALE Admin', body: `Hello ${name},\n\n${by} has invited you to the SENTBALE admin panel as ${role}.\n\nSet your password here (the link works once, for 7 days):\n${link}\n` });
+  outbox.push({ to: address, subject: 'You are invited to SENTBALE Admin', body: `Hello ${name},\n\n${by} has invited you to the SENTBALE admin panel as ${role}.\n\nSet your password here (the link works once, for 7 days):\n${link}\n` });
   return `Invitation for ${name}: ${link}`;
 }
 
-async function upsertMember(tx: Tx, row: unknown, admin: Admin, notices: string[]) {
+async function upsertMember(tx: Tx, row: unknown, admin: Admin, notices: string[], outbox: Mail[]) {
   const m = parse(memberSchema, row, 'team member');
   const roles = (await tx.select().from(s.adminRecords).where(eq(s.adminRecords.list, 'roles'))).map(r => String(r.data.name));
   if (!roles.includes(m.role) && m.role !== 'Owner') throw new WorkspaceError('Choose one of the roles in Roles & Permissions.');
@@ -248,7 +248,7 @@ async function upsertMember(tx: Tx, row: unknown, admin: Admin, notices: string[
     const [clash] = await tx.select({ id: s.admins.id }).from(s.admins).where(eq(s.admins.email, m.email));
     if (clash) throw new WorkspaceError('This email is already on the team.');
     await tx.insert(s.admins).values({ id: m.id, name: m.name, email: m.email, role: m.role, status: 'Invited' });
-    notices.push(await inviteMail(tx, m.id, m.name, m.email, m.role, admin.name));
+    notices.push(await inviteMail(tx, m.id, m.name, m.email, m.role, admin.name, outbox));
     return;
   }
   if (existing.role === 'Owner' && !isOwner(admin)) throw new WorkspaceError('Only an Owner can change another Owner.');
@@ -257,7 +257,7 @@ async function upsertMember(tx: Tx, row: unknown, admin: Admin, notices: string[
   if (existing.role === 'Owner' && existing.status === 'Active' && (m.role !== 'Owner' || status !== 'Active') && (await activeOwners(tx, existing.id)) === 0) throw new WorkspaceError('The store needs at least one active Owner.');
   await tx.update(s.admins).set({ name: m.name, role: m.role, status, ...(existing.status === 'Invited' ? { email: m.email } : {}) }).where(eq(s.admins.id, m.id));
   if (status === 'Suspended') await tx.delete(s.adminSessions).where(eq(s.adminSessions.adminId, m.id));
-  if (m.reinvite && existing.status === 'Invited') notices.push(await inviteMail(tx, m.id, m.name, existing.status === 'Invited' ? m.email : existing.email, m.role, admin.name));
+  if (m.reinvite && existing.status === 'Invited') notices.push(await inviteMail(tx, m.id, m.name, existing.status === 'Invited' ? m.email : existing.email, m.role, admin.name, outbox));
 }
 
 async function removeMember(tx: Tx, memberId: string, admin: Admin) {
@@ -287,7 +287,9 @@ export async function applyChanges(admin: Admin, changes: Changes) {
   }
   for (const key of Object.keys(changes.objects)) if (!allows(access, key, 'manage')) throw new WorkspaceError('Your role does not allow this change.');
 
-  return (await db()).transaction(async tx => {
+  // Invitation emails go out only once the save has committed, so a failed save never sends a dead link.
+  const outbox: Mail[] = [];
+  const result = await (await db()).transaction(async tx => {
     await claim(tx);
     let catalogChanged = false;
     const notices: string[] = [];
@@ -313,7 +315,7 @@ export async function applyChanges(admin: Admin, changes: Changes) {
         for (const row of change.upsert) await upsertCustomer(tx, row);
         if (change.remove.length) await tx.delete(s.customers).where(inArray(s.customers.id, change.remove));
       } else if (list === 'team') {
-        for (const row of change.upsert) await upsertMember(tx, row, admin, notices);
+        for (const row of change.upsert) await upsertMember(tx, row, admin, notices, outbox);
         for (const memberId of change.remove) await removeMember(tx, memberId, admin);
       } else if (list === 'enquiries') {
         for (const row of change.upsert) await tx.update(s.enquiries).set({ handled: row.handled === true }).where(eq(s.enquiries.id, String(row.id)));
@@ -331,6 +333,8 @@ export async function applyChanges(admin: Admin, changes: Changes) {
     if (catalogChanged) await touchCatalog(tx);
     return { catalogChanged, notices };
   });
+  await queueMail(...outbox);
+  return result;
 }
 
 /**

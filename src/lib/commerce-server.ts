@@ -256,6 +256,6 @@ async function announceOrder(orderId: string) {
     const ordered = new Set(items.map(i => `${i.productId}-${i.size}`));
     const low = lowStock.filter(v => ordered.has(v.id));
     if (settings.email && settings.notifyLowStock && low.length) mails.push({ to: settings.email, subject: `Low stock: ${low.map(v => v.sku).join(', ')}`, body: low.map(v => `${v.sku}: ${v.stock} left (alert at ${v.threshold})`).join('\n') + `\n\n${config.siteUrl}/admin/inventory` });
-    queueMail(...mails);
+    await queueMail(...mails);
   } catch (error) { console.error('[orders] notification', error); }
 }

@@ -30,7 +30,11 @@ export async function sendMail(mail: Mail) {
   }
 }
 
-/** Sends without delaying the response that triggered it. */
-export function queueMail(...mails: (Mail | null | undefined | false)[]) {
-  for (const mail of mails) if (mail && mail.to) void sendMail(mail);
+/**
+ * Sends the emails side by side and resolves when all are recorded and sent (or failed). Callers await it
+ * before responding: serverless hosts such as Firebase App Hosting pause the server once the response is out,
+ * which would cut off a send still in flight. Never throws.
+ */
+export async function queueMail(...mails: (Mail | null | undefined | false)[]) {
+  await Promise.all(mails.filter((mail): mail is Mail => !!mail && !!mail.to).map(sendMail));
 }

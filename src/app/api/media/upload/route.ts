@@ -1,7 +1,5 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { mediaDirectory } from '@/lib/media-server';
+import { saveUpload } from '@/lib/media-store';
 import { adminWriteDenied } from '@/lib/admin-auth';
 export const runtime = 'nodejs';
 const LIMIT = 8 * 1024 * 1024;
@@ -16,8 +14,7 @@ export async function POST(request: Request) {
     const ext = bytes.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10])) ? 'png' : bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255 ? 'jpg' : bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP' ? 'webp' : null;
     if (!ext) return Response.json({ error: 'This file is not a supported image. Use PNG, JPEG or WebP.' }, { status: 415 });
     const name = `${randomUUID()}.${ext}`;
-    await mkdir(mediaDirectory, { recursive: true });
-    await writeFile(path.join(/*turbopackIgnore: true*/ mediaDirectory, name), bytes, { flag: 'wx' });
+    await saveUpload(name, bytes, ext === 'jpg' ? 'image/jpeg' : `image/${ext}`);
     return Response.json({ src: `/api/media/files/${name}`, name }, { status: 201 });
-  } catch { return Response.json({ error: 'The image could not be uploaded. Please try again.' }, { status: 500 }); }
+  } catch (error) { console.error('[api/media/upload]', error); return Response.json({ error: 'The image could not be uploaded. Please try again.' }, { status: 500 }); }
 }

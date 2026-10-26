@@ -1,0 +1,22 @@
+{
+  "apphosting": {
+    "backendId": "sentbale",
+    "rootDir": "/",
+    "ignore": [
+      "node_modules",
+      ".git",
+      ".next",
+      ".env",
+      ".env.*",
+      ".tools",
+      ".preview",
+      "data",
+      "data-backup-*",
+      "tests",
+      "test-results",
+      "playwright-report",
+      "*.log",
+      "*.tsbuildinfo"
+    ]
+  }
+}

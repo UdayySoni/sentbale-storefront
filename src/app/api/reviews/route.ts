@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const data = { id, productId: product.id, product: product.name, customerId: user.id, customer: user.name, rating, title, body: text, status: 'Pending', date: new Date().toISOString() };
     await database.insert(schema.adminRecords).values({ list: 'reviews', id, data }).onConflictDoUpdate({ target: [schema.adminRecords.list, schema.adminRecords.id], set: { data, updatedAt: new Date() } });
     const settings = await setting('settings', database);
-    if (settings.email && settings.notifyReviews) queueMail({ to: settings.email, subject: `New review of ${product.name} (${rating}/5)`, body: `${user.name} wrote:\n\n${title}\n${text}\n\nPublish or hide it at ${config.siteUrl}/admin/reviews` });
+    if (settings.email && settings.notifyReviews) await queueMail({ to: settings.email, subject: `New review of ${product.name} (${rating}/5)`, body: `${user.name} wrote:\n\n${title}\n${text}\n\nPublish or hide it at ${config.siteUrl}/admin/reviews` });
     return Response.json({ ok: true });
   } catch (error) {
     console.error('[api/reviews]', error);

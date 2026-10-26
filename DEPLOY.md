@@ -31,6 +31,15 @@ All settings are environment variables; `.env.example` describes each one.
 
 Images are kept in the `media` volume and the database in `pgdata`. Back up both.
 
+## Option C — Firebase App Hosting (the live store)
+
+The store runs on Firebase App Hosting in project `sentbale-store`, backend `sentbale` (region asia-southeast1), with its PostgreSQL on Neon. `apphosting.yaml` holds the server size and settings; `firebase.json` lists what is never uploaded (`.env*`, `data/`, `.tools/`…).
+
+- **Deploy:** `firebase deploy --only apphosting` from the project root. It uploads the source and builds in the cloud.
+- **Secrets** (Cloud Secret Manager): `databaseUrl` (the Neon pooled connection string) and `adminSetupCode`. Add others such as Razorpay or Resend keys with `firebase apphosting:secrets:set <name>`, then reference them in `apphosting.yaml` with `secret: <name>`.
+- **Images:** App Hosting has no lasting disk, so uploads go to the Cloud Storage bucket in `MEDIA_BUCKET` (`sentbale-store.firebasestorage.app`, under `media/`).
+- **Custom domain:** Firebase console → App Hosting → sentbale → Settings → Domains. Add the domain's records at the registrar, then add the domain to `SITE_URL` in `apphosting.yaml` and redeploy.
+
 ## Option B — a Node.js host (Render, Railway, a VPS)
 
 - Node.js 22. Build command `npm ci && npm run build`; start command `npx next start --hostname 0.0.0.0` (the host's `PORT` is used).

@@ -20,7 +20,7 @@ export async function POST(request:Request) {
     // Contact messages are also sent to the store's inbox (Business Settings → Email).
     if(data.kind==='contact') {
       const store=await setting('settings');
-      if(store.email) queueMail({to:store.email,subject:`Message from ${text(data.name)}: ${text(data.subject)}`.slice(0,200),body:`From: ${text(data.name)} <${email}>\n\n${text(data.message)}\n\nAll messages: ${config.siteUrl}/admin/customers?tab=messages`});
+      if(store.email) await queueMail({to:store.email,subject:`Message from ${text(data.name)}: ${text(data.subject)}`.slice(0,200),body:`From: ${text(data.name)} <${email}>\n\n${text(data.message)}\n\nAll messages: ${config.siteUrl}/admin/customers?tab=messages`});
     }
     return Response.json({ok:true});
   } catch(error) {if(!(error instanceof Invalid)) console.error('[api/enquiries]',error); return Response.json({error:error instanceof Invalid?error.message:'Unable to save. Please try again.'},{status:400});}
