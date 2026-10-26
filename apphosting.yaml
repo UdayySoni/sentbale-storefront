@@ -12,7 +12,7 @@ runConfig:
 env:
   # Public address(es), comma-separated. Forms, checkout and admin saves are accepted only from these.
   - variable: SITE_URL
-    value: https://sentbale--sentbale-store.asia-southeast1.hosted.app
+    value: https://sentbale--sentbale-store.asia-southeast1.hosted.app,https://sentbaleperfumes.com,https://www.sentbaleperfumes.com
   # Uploaded images go to the project's Firebase Storage bucket (App Hosting has no lasting disk).
   - variable: MEDIA_BUCKET
     value: sentbale-store.firebasestorage.app
