@@ -164,6 +164,17 @@ export const orders = pgTable('orders', {
   /** Stock is held for unpaid orders until this time. */
   expiresAt: timestamp('expires_at', { withTimezone: true }),
   total: integer('total').notNull(),
+  /** Shiprocket order and shipment ids, once the order has been sent there. */
+  shipRef: text('ship_ref'),
+  shipmentId: text('shipment_id'),
+  /** Tracking number and courier, once Shiprocket assigns one. */
+  awb: text('awb'),
+  courier: text('courier'),
+  /** Shiprocket's latest shipment status, as it words it (e.g. "IN TRANSIT"). */
+  shipStatus: text('ship_status'),
+  /** Why the order could not be sent to Shiprocket; cleared on success. */
+  shipError: text('ship_error'),
+  shipSyncedAt: timestamp('ship_synced_at', { withTimezone: true }),
   createdAt: created(),
   updatedAt: updated(),
 }, t => [

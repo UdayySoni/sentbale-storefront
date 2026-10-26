@@ -6,6 +6,7 @@ import { money, sizes, type Size } from './catalog';
 import { config, razorpayEnabled, testPaymentsEnabled } from './config';
 import { records, setting } from './records-server';
 import { queueMail, type Mail } from './mail-server';
+import { courierRates, parcelWeight, sendToShiprocket } from './shiprocket-server';
 import type { Coupon, Zone } from './admin/types';
 
 /** Shown to the shopper as-is. */
@@ -18,7 +19,7 @@ export type OrderStatus = 'Pending payment' | 'Processing' | 'Shipped' | 'Delive
 export type PaymentStatus = 'Pending' | 'Paid' | 'Failed' | 'Refunded';
 type Source = Database | Tx;
 
-const DEFAULT_DELIVERY = { standard: 0, express: 199, eta: '3–5 business days' };
+const DEFAULT_DELIVERY = { standard: 0, express: 199, eta: '3–5 business days', expressEta: '1–2 business days' };
 const EVERYWHERE = ['*', 'all', 'india', 'all india', 'rest of india', 'everywhere'];
 /** Orders in these states no longer hold stock. */
 const RELEASED: OrderStatus[] = ['Cancelled', 'Refunded'];
@@ -60,7 +61,7 @@ export function couponResult(coupons: Coupon[], code: string, subtotal: number, 
 
 // ---- Quote ----------------------------------------------------------------------------------
 
-export type QuoteInput = { items: CartItem[]; delivery: Delivery; state?: string; coupon?: string };
+export type QuoteInput = { items: CartItem[]; delivery: Delivery; state?: string; pincode?: string; coupon?: string };
 
 /** Everything checkout shows and charges, computed from the database. Never trusts client prices. */
 export async function quote(input: QuoteInput, source?: Source) {
@@ -84,12 +85,17 @@ export async function quote(input: QuoteInput, source?: Source) {
   const applied = input.coupon?.trim() ? couponResult(coupons, input.coupon, subtotal) : null;
   const discount = applied?.discount ?? 0;
   const zone = zones.some(z => z.status === 'Active') ? zoneFor(zones, input.state ?? '') : null;
-  const deliverable = !input.state?.trim() || !zones.some(z => z.status === 'Active') || !!zone;
-  const rates = zone ? { standard: Number(zone.standard) || 0, express: Number(zone.express) || 0, eta: zone.eta || DEFAULT_DELIVERY.eta } : DEFAULT_DELIVERY;
+  // With Shiprocket set up, a pincode gets live courier rates and couriers decide where we deliver;
+  // shipping zones then only set free-delivery thresholds. Without it (or if it does not answer), zones price delivery.
+  const live = input.pincode && lines.length ? await courierRates(input.pincode, parcelWeight(lines)) : null;
+  const deliverable = live ? live !== 'none' : !input.state?.trim() || !zones.some(z => z.status === 'Active') || !!zone;
+  const rates = live && live !== 'none' ? { standard: live.standard.price, express: live.express.price, eta: live.standard.eta, expressEta: live.express.eta }
+    : zone ? { standard: Number(zone.standard) || 0, express: Number(zone.express) || 0, eta: zone.eta || DEFAULT_DELIVERY.eta, expressEta: DEFAULT_DELIVERY.expressEta }
+    : DEFAULT_DELIVERY;
   const freeStandard = applied?.freeShipping || (!!zone && Number(zone.freeAbove) > 0 && subtotal - discount >= Number(zone.freeAbove));
   const options = [
     { id: 'standard' as const, label: 'Standard delivery', eta: rates.eta, price: freeStandard ? 0 : rates.standard },
-    { id: 'express' as const, label: 'Express delivery', eta: '1–2 business days', price: applied?.freeShipping ? 0 : rates.express },
+    { id: 'express' as const, label: 'Express delivery', eta: rates.expressEta, price: applied?.freeShipping ? 0 : rates.express },
   ];
   const shipping = options.find(o => o.id === input.delivery)?.price ?? 0;
 
@@ -170,7 +176,7 @@ export async function placeOrder(input: PlaceOrder) {
     const [existing] = await tx.select().from(s.orders).where(and(eq(s.orders.customerId, input.customer.id), eq(s.orders.requestId, input.requestId)));
     if (existing) return { ...(await withItems(existing, tx)), created: false };
     // Delivery is priced for the address being shipped to.
-    const priced = await quote({ ...input, state: input.address.state }, tx);
+    const priced = await quote({ ...input, state: input.address.state, pincode: input.address.pincode }, tx);
     if (priced.problems.length) throw new CheckoutError(priced.problems[0]);
     if (!priced.deliverable) throw new CheckoutError(`We don’t deliver to ${input.address.state} yet.`);
     if (priced.coupon && !priced.coupon.applied) throw new CheckoutError(priced.coupon.message);
@@ -190,7 +196,10 @@ export async function placeOrder(input: PlaceOrder) {
     const items = await tx.insert(s.orderItems).values(priced.lines.map((l, line) => ({ orderId: id, line, productId: l.id, size: l.size, quantity: l.quantity, name: l.name, image: l.image, unitPrice: l.unitPrice }))).returning();
     return { order, items, created: true };
   });
-  if (result.created && result.order.status === 'Processing') await announceOrder(result.order.id);
+  if (result.created && result.order.status === 'Processing') {
+    await announceOrder(result.order.id);
+    if (result.order.paymentProvider === 'cod') await sendToShiprocket(result.order.id);
+  }
   return result;
 }
 
@@ -227,6 +236,7 @@ export async function markPaid(orderId: string, paymentId: string) {
     // The shopper's confirmation screen shows the returned order, so it must carry the new status.
     if (['Pending payment', 'Cancelled'].includes(result.before.status)) order = (await updateOrder(orderId, { status: 'Processing' }))?.after ?? order;
     await announceOrder(orderId);
+    await sendToShiprocket(orderId);
   }
   return order;
 }

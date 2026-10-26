@@ -1,6 +1,7 @@
 import 'server-only';
 import { asc, desc, eq, inArray } from 'drizzle-orm';
 import { db, schema as s } from '@/db';
+import { needsRefresh, refreshTracking, trackingUrl } from './shiprocket-server';
 import type { DemoOrder } from './store';
 import type { Size } from './catalog';
 
@@ -12,14 +13,19 @@ export function toDemoOrder(order: typeof s.orders.$inferSelect, items: (typeof 
     subtotal: order.subtotal, discount: order.discount, couponCode: order.couponCode, tax: order.tax, taxIncluded: order.taxIncluded,
     status: order.status, paymentStatus: order.paymentStatus, paymentMethod: order.paymentMethod,
     items: snapshot.map(({ id, size, quantity }) => ({ id, size, quantity })), snapshot, address: order.address ?? undefined,
+    ...(order.awb || order.shipStatus ? { tracking: { courier: order.courier ?? undefined, awb: order.awb ?? undefined, status: order.shipStatus ?? undefined, url: order.awb ? trackingUrl(order.awb) : undefined } } : {}),
   };
 }
 
 /** A customer's orders, newest first. Online orders whose payment never completed are left out. */
 export async function listOrders(customerId: string) {
   const database = await db();
-  const rows = (await database.select().from(s.orders).where(eq(s.orders.customerId, customerId)).orderBy(desc(s.orders.number)))
+  const load = async () => (await database.select().from(s.orders).where(eq(s.orders.customerId, customerId)).orderBy(desc(s.orders.number)))
     .filter(o => !(o.paymentProvider === 'razorpay' && o.paymentStatus === 'Failed'));
+  let rows = await load();
+  // Orders on their way get the courier's latest status (at most every half hour per order).
+  const stale = rows.filter(needsRefresh).map(o => o.id);
+  if (stale.length) { await refreshTracking(stale); rows = await load(); }
   if (!rows.length) return [];
   const items = await database.select().from(s.orderItems).where(inArray(s.orderItems.orderId, rows.map(r => r.id))).orderBy(asc(s.orderItems.line));
   return rows.map(order => toDemoOrder(order, items.filter(i => i.orderId === order.id)));

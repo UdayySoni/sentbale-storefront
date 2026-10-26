@@ -5,7 +5,9 @@ import { sizes, type Size, priceFor } from './catalog';
 
 export type CartLine = { id: string; size: Size; quantity: number };
 export type DemoOrder = { id: string; date: string; items: CartLine[]; total: number; name: string; shipping?: number;
-  number?: number; status?: string; paymentStatus?: string; paymentMethod?: string; subtotal?: number; discount?: number; couponCode?: string | null; tax?: number; taxIncluded?: boolean; address?: { line: string; city: string; state: string; pincode: string }; snapshot?: (CartLine & { name: string; unitPrice: number; image: string })[] };
+  number?: number; status?: string; paymentStatus?: string; paymentMethod?: string; subtotal?: number; discount?: number; couponCode?: string | null; tax?: number; taxIncluded?: boolean; address?: { line: string; city: string; state: string; pincode: string }; snapshot?: (CartLine & { name: string; unitPrice: number; image: string })[];
+  /** Courier tracking once the order has been handed to Shiprocket. */
+  tracking?: { courier?: string; awb?: string; status?: string; url?: string } };
 const CART_KEY = 'sentbale.cart.v1';
 const WISH_KEY = 'sentbale.wishlist.v1';
 

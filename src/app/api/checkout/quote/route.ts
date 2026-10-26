@@ -11,7 +11,8 @@ export async function POST(request: Request) {
     const delivery: Delivery = body?.delivery === 'express' ? 'express' : 'standard';
     const state = typeof body?.state === 'string' ? body.state.slice(0, 80) : '';
     const coupon = typeof body?.coupon === 'string' ? body.coupon.slice(0, 20) : '';
-    const result = await quote({ items: cartItems(body?.items), delivery, state, coupon });
+    const pincode = typeof body?.pincode === 'string' && /^[1-9][0-9]{5}$/.test(body.pincode) ? body.pincode : '';
+    const result = await quote({ items: cartItems(body?.items), delivery, state, pincode, coupon });
     // Internal stock details stay on the server.
     const { lines, coupon: code, ...rest } = result;
     return Response.json({

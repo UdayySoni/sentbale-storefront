@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { currentUser } from '@/lib/accounts-server';
 import { cartItems, CheckoutError, placeOrder, updateOrder, type PaymentChoice } from '@/lib/commerce-server';
-import { config, razorpayEnabled, testPaymentsEnabled } from '@/lib/config';
+import { config, razorpayEnabled, shiprocketEnabled, testPaymentsEnabled } from '@/lib/config';
 import { toDemoOrder } from '@/lib/orders-server';
 import { createRazorpayOrder } from '@/lib/razorpay-server';
 import { writeAllowed } from '@/lib/request-security';
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     const name = text(body.name, 100);
     if (!name || !['standard', 'express'].includes(body.delivery)) throw new CheckoutError('Check your delivery details.');
     const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
-    if (phone && !/^[0-9+ ()-]{10,16}$/.test(phone)) throw new CheckoutError('Enter a valid phone number.');
+    if ((phone || shiprocketEnabled()) && !/^[0-9+ ()-]{10,16}$/.test(phone)) throw new CheckoutError('Enter a valid phone number for the courier.');
     const payment: PaymentChoice = ['test', 'razorpay', 'cod'].includes(body.payment) ? body.payment : testPaymentsEnabled() ? 'test' : 'razorpay';
     const coupon = typeof body.coupon === 'string' && body.coupon.trim() ? body.coupon.slice(0, 20) : undefined;
 

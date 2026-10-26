@@ -36,6 +36,15 @@ export const config = {
     resendApiKey: env('RESEND_API_KEY'),
     from: env('MAIL_FROM'),
   },
+  /** Shiprocket API user (Settings → API → Configure in Shiprocket; not the account's own login). */
+  shiprocket: {
+    email: env('SHIPROCKET_EMAIL'),
+    password: env('SHIPROCKET_PASSWORD'),
+    /** Pickup location name as saved in Shiprocket; the account's primary one when unset. */
+    pickup: env('SHIPROCKET_PICKUP'),
+    /** Token Shiprocket sends (x-api-key) with tracking updates to /api/shipping/tracking-updates. */
+    webhookToken: env('SHIPROCKET_WEBHOOK_TOKEN'),
+  },
   /** Minutes an unpaid online order holds its stock. */
   holdMinutes: Number(env('ORDER_HOLD_MINUTES') || 30),
 };
@@ -47,6 +56,7 @@ export const razorpayEnabled = () => !!(config.payments.razorpayKeyId && config.
  */
 export const testPaymentsEnabled = () => config.payments.allowTest || (!config.production && !razorpayEnabled());
 export const mailEnabled = () => !!(config.mail.resendApiKey && config.mail.from);
+export const shiprocketEnabled = () => !!(config.shiprocket.email && config.shiprocket.password);
 
 /** Problems that make a production deployment unsafe or broken. */
 export function configProblems() {
@@ -58,6 +68,7 @@ export function configProblems() {
     if (razorpayEnabled() && !config.payments.razorpayWebhookSecret) problems.push('RAZORPAY_WEBHOOK_SECRET is required when Razorpay is configured.');
     if (!!config.payments.razorpayKeyId !== !!config.payments.razorpayKeySecret) problems.push('Set both RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET, or neither.');
     if (!!config.mail.resendApiKey !== !!config.mail.from) problems.push('Set both RESEND_API_KEY and MAIL_FROM, or neither.');
+    if (!!config.shiprocket.email !== !!config.shiprocket.password) problems.push('Set both SHIPROCKET_EMAIL and SHIPROCKET_PASSWORD, or neither.');
     if (env('ADMIN_SETUP_CODE') && env('ADMIN_SETUP_CODE').length < 12) problems.push('ADMIN_SETUP_CODE must be at least 12 characters.');
   }
   if (!Number.isInteger(config.holdMinutes) || config.holdMinutes < 5 || config.holdMinutes > 1440) problems.push('ORDER_HOLD_MINUTES must be a whole number from 5 to 1440.');

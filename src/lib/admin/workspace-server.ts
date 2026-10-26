@@ -8,10 +8,11 @@ import { issueInvite, type Admin } from '@/lib/admin-auth';
 import { recordAudit } from '@/lib/audit-server';
 import { products as builtInProducts, sizes } from '@/lib/catalog';
 import { updateOrderIn, type OrderStatus, type PaymentStatus } from '@/lib/commerce-server';
-import { config } from '@/lib/config';
+import { config, shiprocketEnabled } from '@/lib/config';
 import { queueMail, type Mail } from '@/lib/mail-server';
 import { isAllowedMediaSource } from '@/lib/media';
 import { setting } from '@/lib/records-server';
+import { sendToShiprocket } from '@/lib/shiprocket-server';
 import { accessFor, allows, isOwner, type AccessMap } from './access-server';
 import { DB_VERSION, seed } from './seed';
 import type { AdminProduct, AuditEntry, Collection, Customer, Db, Enquiry, Homepage, Member, Order, Row, Settings, Sku } from './types';
@@ -55,6 +56,8 @@ const customerSchema = z.object({
 const orderSchema = z.object({
   id, customer: text(100), email, skuId: id.optional(), qty: z.number().int().min(1).max(10).default(1), payment: z.string().trim().max(40).default(''),
   status: z.enum(ORDER_STATUSES).default('Processing'), paid: z.enum(PAYMENT_STATUSES).default('Pending'),
+  /** Set by the "Send to Shiprocket" action. */
+  ship: z.literal('send').optional(),
 });
 const memberSchema = z.object({ id, name: text(100), email, role: text(60), status: z.enum(['Invited', 'Active', 'Suspended']), reinvite: z.boolean().optional() });
 const json = (max: number) => z.record(z.string(), z.unknown()).refine(v => JSON.stringify(v).length <= max, 'This entry is too large.');
@@ -96,6 +99,9 @@ function adminOrder(o: typeof s.orders.$inferSelect, items: (typeof s.orderItems
     item: first ? `${first.name} · ${first.size}ml${items.length > 1 ? ` + ${items.length - 1} more` : ''}` : '',
     qty: items.reduce((sum, i) => sum + i.quantity, 0), amount: o.total,
     status: o.status as Order['status'], payment: o.paymentMethod || o.paymentProvider, paid: o.paymentStatus as Order['paid'], date: o.createdAt.toISOString(),
+    shipping: o.awb ? [o.courier, o.awb].filter(Boolean).join(' · ') : o.shipRef ? `Shiprocket #${o.shipRef} · ${o.shipStatus || 'NEW'}` : o.shipError ? 'Not sent' : '',
+    ...(o.shipError && !o.shipRef ? { shipError: o.shipError } : {}),
+    canShip: shiprocketEnabled() && o.status === 'Processing' && !o.shipRef && !!o.address && o.paymentProvider !== 'test',
   };
 }
 
@@ -185,12 +191,13 @@ async function upsertRecord(tx: Tx, list: RecordList, row: unknown) {
 // ---- Writing: orders and customers ----------------------------------------------------------
 
 /** Existing orders change status through the order lifecycle; new rows become real (manual) orders. */
-async function upsertOrder(tx: Tx, row: unknown) {
+async function upsertOrder(tx: Tx, row: unknown, toShip: string[]) {
   const o = parse(orderSchema, row, 'order');
   const [existing] = await tx.select().from(s.orders).where(eq(s.orders.id, o.id));
   if (existing) {
     await updateOrderIn(tx, o.id, { status: o.status as OrderStatus, paymentStatus: o.paid as PaymentStatus });
     if (existing.name !== o.customer || existing.email !== o.email) await tx.update(s.orders).set({ name: o.customer, email: o.email, updatedAt: new Date() }).where(eq(s.orders.id, o.id));
+    if (o.ship === 'send') toShip.push(o.id);
     return;
   }
   if (o.status === 'Pending payment') throw new WorkspaceError('Orders added here start as Processing or later.');
@@ -289,6 +296,8 @@ export async function applyChanges(admin: Admin, changes: Changes) {
 
   // Invitation emails go out only once the save has committed, so a failed save never sends a dead link.
   const outbox: Mail[] = [];
+  // Orders to send to Shiprocket; that runs after the commit, since the save holds a lock on each order row.
+  const toShip: string[] = [];
   const result = await (await db()).transaction(async tx => {
     await claim(tx);
     let catalogChanged = false;
@@ -309,7 +318,7 @@ export async function applyChanges(admin: Admin, changes: Changes) {
         for (const row of change.upsert) await upsertCollection(tx, row);
         if (change.remove.length) await tx.delete(s.collections).where(inArray(s.collections.id, change.remove));
       } else if (list === 'orders') {
-        for (const row of change.upsert) { await upsertOrder(tx, row); catalogChanged = true; }
+        for (const row of change.upsert) { await upsertOrder(tx, row, toShip); catalogChanged = true; }
         if (change.remove.length) throw new WorkspaceError('Orders cannot be deleted. Cancel or refund them instead.');
       } else if (list === 'customers') {
         for (const row of change.upsert) await upsertCustomer(tx, row);
@@ -334,6 +343,7 @@ export async function applyChanges(admin: Admin, changes: Changes) {
     return { catalogChanged, notices };
   });
   await queueMail(...outbox);
+  for (const orderId of toShip) await sendToShiprocket(orderId);
   return result;
 }
 

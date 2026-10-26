@@ -242,6 +242,7 @@ function Checkout({ store }: { store: Store }) {
   const [complete, setComplete] = useState<DemoOrder | null>(null);
   const [delivery, setDelivery] = useState<'standard' | 'express'>('standard');
   const [state, setState] = useState('');
+  const [pincode, setPincode] = useState('');
   const [couponInput, setCouponInput] = useState('');
   const [coupon, setCoupon] = useState('');
   const [payment, setPayment] = useState(choices[0] ?? 'test');
@@ -257,13 +258,13 @@ function Checkout({ store }: { store: Store }) {
     let active = true;
     const timer = setTimeout(async () => {
       try {
-        const response = await fetch('/api/checkout/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: store.cart, delivery, state, coupon }) });
+        const response = await fetch('/api/checkout/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: store.cart, delivery, state, pincode, coupon }) });
         const data = await response.json();
         if (active && response.ok) setQuote(data);
       } catch { /* Keep the last totals; the order itself is priced on the server. */ }
     }, 250);
     return () => { active = false; clearTimeout(timer); };
-  }, [store.cart, store.ready, delivery, state, coupon]);
+  }, [store.cart, store.ready, delivery, state, pincode, coupon]);
 
   async function payOnline(data: { order: DemoOrder; razorpay: { keyId: string; orderId: string; amount: number; currency: string; name: string; email: string; phone: string } }) {
     const Razorpay = await razorpayScript();
@@ -311,7 +312,7 @@ function Checkout({ store }: { store: Store }) {
     {payment === 'test' && <div className="demo-notice"><LockKeyhole size={17} /><span>Test checkout. Use sample details. No payment is taken and no shipment is created.</span></div>}
     <form className="checkout-layout" onSubmit={submit}><div>
       <h2><span className="step-number">01</span> Your details</h2>
-      <div className="form-grid"><Field label="Full name" name="name" autoComplete="name" defaultValue={account.user.name} required /><Field label="Email address" name="email" type="email" autoComplete="email" defaultValue={account.user.email} readOnly required /><Field label="Phone number" name="phone" type="tel" pattern="[0-9+ ()-]{10,16}" autoComplete="tel" required /><Field label="Pincode" name="pincode" inputMode="numeric" pattern="[1-9][0-9]{5}" autoComplete="postal-code" required /><div className="full"><Field label="Delivery address" name="address" autoComplete="street-address" required /></div><Field label="City" name="city" autoComplete="address-level2" required /><Field label="State" name="state" autoComplete="address-level1" required onBlur={e => setState(e.currentTarget.value.trim())} /></div>
+      <div className="form-grid"><Field label="Full name" name="name" autoComplete="name" defaultValue={account.user.name} required /><Field label="Email address" name="email" type="email" autoComplete="email" defaultValue={account.user.email} readOnly required /><Field label="Phone number" name="phone" type="tel" pattern="[0-9+ ()-]{10,16}" autoComplete="tel" required /><Field label="Pincode" name="pincode" inputMode="numeric" pattern="[1-9][0-9]{5}" autoComplete="postal-code" required onBlur={e => { const value = e.currentTarget.value.trim(); setPincode(/^[1-9][0-9]{5}$/.test(value) ? value : ''); }} /><div className="full"><Field label="Delivery address" name="address" autoComplete="street-address" required /></div><Field label="City" name="city" autoComplete="address-level2" required /><Field label="State" name="state" autoComplete="address-level1" required onBlur={e => setState(e.currentTarget.value.trim())} /></div>
       <h2><span className="step-number">02</span> Delivery</h2>
       <div className="shipping-options">{options.map(o => <label key={o.id} className={delivery === o.id ? 'selected' : ''}><input type="radio" name="delivery" value={o.id} checked={delivery === o.id} onChange={() => setDelivery(o.id)} /><span><strong>{o.label}</strong><small>{o.eta}</small></span><span>{o.price ? money(o.price) : 'Complimentary'}</span></label>)}</div>
       {quote && !quote.deliverable && <p className="form-message" role="alert">We don’t deliver to {state} yet.</p>}

@@ -1,7 +1,8 @@
-import { and, eq, lt, or, isNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, isNull, lt, or } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { adminWriteDenied, currentAdmin } from '@/lib/admin-auth';
 import { applyChanges, changesSchema, importable, importWorkspace, readWorkspace, resetWorkspace, WorkspaceError } from '@/lib/admin/workspace-server';
+import { needsRefresh, refreshTracking } from '@/lib/shiprocket-server';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const reply = (data: unknown, status = 200) => Response.json(data, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -15,6 +16,10 @@ export async function GET() {
     // "Last active" for Team members, written at most every five minutes.
     await (await db()).update(schema.admins).set({ lastActiveAt: new Date() })
       .where(and(eq(schema.admins.id, admin.id), or(isNull(schema.admins.lastActiveAt), lt(schema.admins.lastActiveAt, new Date(Date.now() - 300000)))));
+    // Orders on their way get the courier's latest status (the webhook usually has it already).
+    const moving = await (await db()).select({ id: schema.orders.id, shipRef: schema.orders.shipRef, status: schema.orders.status, shipSyncedAt: schema.orders.shipSyncedAt })
+      .from(schema.orders).where(and(isNotNull(schema.orders.shipRef), inArray(schema.orders.status, ['Processing', 'Shipped']))).orderBy(desc(schema.orders.number)).limit(50);
+    await refreshTracking(moving.filter(needsRefresh).map(o => o.id));
     const [workspace, canImport] = await Promise.all([readWorkspace(admin), importable()]);
     return reply({ db: workspace, importable: canImport });
   } catch (error) { console.error('[api/admin/workspace]', error); return reply({ error: 'The admin workspace could not be loaded.' }, 500); }

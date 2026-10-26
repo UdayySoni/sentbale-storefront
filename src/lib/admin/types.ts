@@ -3,7 +3,9 @@ import type { Family } from '@/lib/catalog';
 export type OrderStatus = 'Pending payment' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'Refunded';
 export type AdminProduct = { id: string; name: string; family: Family; mood: string; description: string; price: number; image: string; badge?: string; status: 'Active' | 'Draft' };
 export type Sku = { id: string; productId: string; product: string; size: number; sku: string; price: number; stock: number; threshold: number };
-export type Order = { id: string; number: number; customer: string; email: string; skuId: string; item: string; qty: number; amount: number; status: OrderStatus; payment: string; paid: 'Paid' | 'Pending' | 'Failed' | 'Refunded'; date: string; phone?: string; address?: string; coupon?: string };
+export type Order = { id: string; number: number; customer: string; email: string; skuId: string; item: string; qty: number; amount: number; status: OrderStatus; payment: string; paid: 'Paid' | 'Pending' | 'Failed' | 'Refunded'; date: string; phone?: string; address?: string; coupon?: string;
+  /** Courier and tracking number, Shiprocket's status, or why sending failed; canShip when it can be (re)sent. */
+  shipping?: string; shipError?: string; canShip?: boolean };
 export type Customer = { id: string; name: string; email: string; phone: string; city: string; tag: 'VIP' | 'Regular' | 'New'; status: 'Active' | 'Blocked'; joined: string };
 export type Collection = { id: string; name: string; description: string; position: number; featured: boolean; status: 'Visible' | 'Hidden' };
 export type Coupon = { id: string; code: string; type: 'Percent' | 'Flat' | 'Free shipping'; value: number; minOrder: number; used: number; limit: number; expires: string; status: 'Active' | 'Paused' | 'Expired' };
