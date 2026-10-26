@@ -9,13 +9,14 @@ import { readCatalog } from '@/lib/catalog-server';
 import { readContent } from '@/lib/content-server';
 import { readMedia } from '@/lib/media-server';
 import { config } from '@/lib/config';
+import { indexableHere } from '@/lib/request-security';
 
-export function generateMetadata(): Metadata {
+export async function generateMetadata(): Promise<Metadata> {
   return {
     title: 'SENTBALE — Scents that stay',
     description: 'Discover a world of fragrance. Explore the SENTBALE collection of oud, floral, woody and citrus perfumes.',
-    // Search engines are kept out until the store is launched (SITE_INDEXABLE=true).
-    robots: config.indexable ? { index: true, follow: true } : { index: false, follow: false },
+    // Search engines are kept out until the store is launched (SITE_INDEXABLE=true), and off any address but the main one.
+    robots: (await indexableHere()) ? { index: true, follow: true } : { index: false, follow: false },
     ...(config.siteOrigins[0] ? { metadataBase: new URL(config.siteOrigins[0]) } : {}),
   };
 }

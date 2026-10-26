@@ -19,8 +19,9 @@ env:
   # The old pre-PostgreSQL files in data/ are local-only; never import them on a hosted store.
   - variable: SENTBALE_LEGACY_IMPORT
     value: "off"
+  # Search engines may list the store, on its main address (the first SITE_URL) only.
   - variable: SITE_INDEXABLE
-    value: "false"
+    value: "true"
   - variable: DATABASE_URL
     secret: databaseUrl
   - variable: ADMIN_SETUP_CODE

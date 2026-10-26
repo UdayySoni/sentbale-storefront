@@ -22,6 +22,18 @@ export function writeAllowed(request: Request) {
   } catch { return false; }
 }
 
+/**
+ * Search engines may index the store (SITE_INDEXABLE=true) only on its main address, the first SITE_URL
+ * origin. Other addresses that serve the same pages, such as the host's own *.hosted.app URL, stay out of
+ * search results so they never compete with the real domain.
+ */
+export async function indexableHere() {
+  if (!config.indexable) return false;
+  const h = await headers();
+  const host = (h.get('x-forwarded-host') || h.get('host') || '').split(',')[0].trim().toLowerCase();
+  return host === new URL(config.siteUrl).host;
+}
+
 /** Cookies are marked Secure whenever the site is reached over HTTPS (directly or behind a proxy). */
 export async function secureCookies() {
   return (await headers()).get('x-forwarded-proto') === 'https' || config.siteUrl.startsWith('https://');
