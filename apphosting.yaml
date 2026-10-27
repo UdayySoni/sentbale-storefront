@@ -37,3 +37,10 @@ env:
     secret: razorpayKeySecret
   - variable: RAZORPAY_WEBHOOK_SECRET
     secret: razorpayWebhookSecret
+  # Shiprocket API user: live courier rates, automatic shipments and tracking.
+  - variable: SHIPROCKET_EMAIL
+    secret: shiprocketEmail
+  - variable: SHIPROCKET_PASSWORD
+    secret: shiprocketPassword
+  - variable: SHIPROCKET_WEBHOOK_TOKEN
+    secret: shiprocketWebhookToken
