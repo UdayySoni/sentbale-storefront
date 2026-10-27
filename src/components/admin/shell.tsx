@@ -3,7 +3,6 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Archive, Bell, Box, ChevronDown, ChevronRight, Clock, CreditCard, ExternalLink, FileText, House, LayoutGrid, LayoutTemplate, LogOut, Menu, Package, Search, Settings, ShieldCheck, ShoppingBag, Star, Tag, Truck, Users, type LucideIcon } from 'lucide-react';
-import { useProducts } from '@/components/catalog-provider';
 import { nav } from '@/lib/admin/nav';
 import { onStoreError, onStoreNotice, patchDb, setActor, useDb } from '@/lib/admin/store';
 import { isLowStock } from '@/lib/admin/types';
@@ -111,7 +110,6 @@ export default function AdminShell({ admin, children }: { admin: AdminUser; chil
 
 function GlobalSearch() {
   const db = useDb();
-  const live = useProducts();
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [open, setOpen, ref] = usePopover<HTMLDivElement>();
@@ -120,12 +118,12 @@ function GlobalSearch() {
     if (!db || term.length < 2) return [];
     const has = (...values: (string | number)[]) => values.some(value => String(value).toLowerCase().includes(term));
     return [
-      ...[...live, ...db.products].filter(p => has(p.name, p.family)).slice(0, 4).map(p => ({ group: 'Products', label: p.name, detail: `${p.family} · Eau de Parfum`, href: `/admin/products?q=${encodeURIComponent(p.name)}` })),
+      ...db.products.filter(p => has(p.name, p.family)).slice(0, 4).map(p => ({ group: 'Products', label: p.name, detail: `${p.family} · Eau de Parfum`, href: `/admin/products?q=${encodeURIComponent(p.name)}` })),
       ...db.orders.filter(o => has(`#${o.number}`, o.customer, o.email)).sort((a, b) => b.number - a.number).slice(0, 4).map(o => ({ group: 'Orders', label: `#${o.number} · ${o.customer}`, detail: `${o.item} · ${o.status}`, href: `/admin/orders?q=${o.number}` })),
       ...db.customers.filter(c => has(c.name, c.email, c.phone)).slice(0, 4).map(c => ({ group: 'Customers', label: c.name, detail: c.email, href: `/admin/customers?q=${encodeURIComponent(c.email)}` })),
       ...nav.filter(item => has(item.label)).slice(0, 3).map(item => ({ group: 'Go to', label: item.label, detail: 'Admin section', href: item.href })),
     ];
-  }, [db, live, query]);
+  }, [db, query]);
   function go(href: string) { setOpen(false); setQuery(''); router.push(href); }
   return <div className="adm-search" ref={ref}>
     <form role="search" onSubmit={event => { event.preventDefault(); if (results[0]) go(results[0].href); }}>

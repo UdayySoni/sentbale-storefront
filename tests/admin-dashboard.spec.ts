@@ -5,7 +5,7 @@ const headers = { Origin: 'http://127.0.0.1:3000' };
 test('admin pages and write routes require a signed-in admin', async ({ page, request }) => {
   await page.goto('/admin/orders');
   await expect(page).toHaveURL(/\/admin\/login\?next=%2Fadmin%2Forders$/);
-  expect((await request.put('/api/catalog', { headers, data: {} })).status()).toBe(401);
+  expect((await request.post('/api/admin/workspace', { headers, data: {} })).status()).toBe(401);
   expect((await request.put('/api/media', { headers, data: {} })).status()).toBe(401);
   expect((await request.post('/api/admin/session', { headers: { Origin: 'https://example.com' }, data: { action: 'login' } })).status()).toBe(403);
   expect((await request.post('/api/admin/session', { headers, data: { action: 'login', email: 'nobody@example.com', password: 'not-the-password-1' } })).status()).toBe(401);

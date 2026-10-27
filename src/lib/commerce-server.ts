@@ -2,7 +2,7 @@ import 'server-only';
 import { randomUUID } from 'node:crypto';
 import { and, asc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { db, schema as s, type Db as Database, type Tx } from '@/db';
-import { money, sizes, type Size } from './catalog';
+import { money, type Size } from './catalog';
 import { config, razorpayEnabled, testPaymentsEnabled } from './config';
 import { records, setting } from './records-server';
 import { queueMail, type Mail } from './mail-server';
@@ -29,7 +29,7 @@ const RELEASED: OrderStatus[] = ['Cancelled', 'Refunded'];
 export function cartItems(value: unknown): CartItem[] {
   const items = value as CartItem[];
   if (!Array.isArray(items) || !items.length || items.length > 12
-    || !items.every(l => l && typeof l.id === 'string' && sizes.includes(l.size) && Number.isInteger(l.quantity) && l.quantity >= 1 && l.quantity <= 10)
+    || !items.every(l => l && typeof l.id === 'string' && Number.isInteger(l.size) && l.size >= 1 && l.size <= 10000 && Number.isInteger(l.quantity) && l.quantity >= 1 && l.quantity <= 10)
     || new Set(items.map(l => `${l.id}-${l.size}`)).size !== items.length) throw new CheckoutError('Check your bag quantities.');
   return items.map(({ id, size, quantity }) => ({ id, size, quantity }));
 }

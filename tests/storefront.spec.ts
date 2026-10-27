@@ -4,11 +4,11 @@ test('catalogue, variants, bag persistence, payment outcomes and local orders', 
   const registered = await page.request.post('/api/account', {headers:{Origin:'http://127.0.0.1:3000'},data:{action:'register',name:'Sample Buyer',email:'test-'+crypto.randomUUID()+'@example.com',password:'Local-test-password-123'}});
   expect(registered.ok()).toBeTruthy();
   await page.goto('/shop');
-  await expect(page.getByRole('heading', { name: 'The fragrance collection.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Shop all' })).toBeVisible();
   await page.getByRole('button', { name: 'Citrus', exact: true }).click();
   await expect(page.locator('.product-card')).toHaveCount(1);
   await expect(page.locator('.product-card h3')).toHaveText('Citrus Bloom');
-  await page.getByRole('button', { name: 'All fragrances', exact: true }).click();
+  await page.getByRole('button', { name: 'All', exact: true }).click();
   await page.getByLabel('Sort fragrances').selectOption('low');
   await expect(page.locator('.product-card h3').first()).toHaveText('Citrus Bloom');
   await page.getByLabel('Save Legacy to favourites').click();
@@ -26,7 +26,7 @@ test('catalogue, variants, bag persistence, payment outcomes and local orders', 
   await page.getByLabel('Open bag, 2 items').click();
   await page.getByLabel('Decrease Legacy 100 ml quantity').click();
   await expect(page.locator('.drawer-summary strong')).toHaveText('₹6,999');
-  await page.getByRole('dialog').getByRole('link', { name: 'Continue to checkout' }).click();
+  await page.getByRole('dialog').getByRole('link', { name: 'Checkout' }).click();
   await page.getByLabel('Full name').fill('Sample Buyer');
 
   await page.getByLabel('Phone number').fill('9999999999');

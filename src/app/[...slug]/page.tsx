@@ -1,5 +1,4 @@
 import Storefront from '@/components/storefront';
-import { families } from '@/lib/catalog';
 import { readCatalog } from '@/lib/catalog-server';
 import { readContent } from '@/lib/content-server';
 import { notFound } from 'next/navigation';
@@ -20,7 +19,7 @@ async function titleFor(path: string): Promise<string | undefined> {
   if (section === 'product') return (await readCatalog()).products.find(p => p.id === slug)?.name;
   if (section === 'collections') {
     const visible = (await readContent()).collections;
-    const family = families.find(f => f.name.toLowerCase() === slug && visible.some(c => c.id === slug));
+    const family = visible.find(c => c.id === slug);
     return family ? `${family.name} fragrances` : undefined;
   }
   if (section === 'journal') return (await readContent()).posts.find(a => a.slug === slug)?.title;

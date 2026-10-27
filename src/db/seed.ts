@@ -1,13 +1,13 @@
 import 'server-only';
 import { count, notInArray } from 'drizzle-orm';
-import { families, ladderPrice, sizes } from '@/lib/catalog';
+import { defaultSizes, families, ladderPrice } from '@/lib/catalog';
 import { skuCode, slug } from '@/lib/admin/seed';
 import * as s from './schema';
 import type { Db, Tx } from './index';
 
 /** The three sizes of a product at the standard price ladder, with stock not yet tracked. */
 export function variantsFor(product: { id: string; name: string; price: number }, threshold = 0) {
-  return sizes.map(size => ({ id: `${product.id}-${size}`, productId: product.id, size, sku: skuCode(product.name, size), price: ladderPrice(product.price, size), stock: 0, threshold }));
+  return defaultSizes.map(size => ({ id: `${product.id}-${size}`, productId: product.id, size, sku: skuCode(product.name, size), price: ladderPrice(product.price, size), stock: 0, threshold }));
 }
 
 /**

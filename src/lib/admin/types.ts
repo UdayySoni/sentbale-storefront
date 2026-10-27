@@ -1,7 +1,8 @@
 import type { Family } from '@/lib/catalog';
 
 export type OrderStatus = 'Pending payment' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'Refunded';
-export type AdminProduct = { id: string; name: string; family: Family; mood: string; description: string; price: number; image: string; badge?: string; status: 'Active' | 'Draft' };
+/** `price` is the lowest size price, kept by the server; sizes, prices and stock are the product's skus. */
+export type AdminProduct = { id: string; name: string; family: Family; mood: string; description: string; price: number; image: string; color: string; notes: [string[], string[], string[]]; badge?: string; status: 'Active' | 'Draft' };
 export type Sku = { id: string; productId: string; product: string; size: number; sku: string; price: number; stock: number; threshold: number };
 export type Order = { id: string; number: number; customer: string; email: string; skuId: string; item: string; qty: number; amount: number; status: OrderStatus; payment: string; paid: 'Paid' | 'Pending' | 'Failed' | 'Refunded'; date: string; phone?: string; address?: string; coupon?: string;
   /** Courier and tracking number, Shiprocket's status, or why sending failed; canShip when it can be (re)sent. */

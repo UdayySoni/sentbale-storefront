@@ -1,9 +1,10 @@
-export type Family = 'Oud' | 'Woody' | 'Floral' | 'Citrus';
+/** A fragrance family; it is also the collection the product is shown in. */
+export type Family = string;
 export type Product = {
   id: string; name: string; family: Family; mood: string; description: string;
   image: string; price: number; color: string; notes: [string[], string[], string[]]; badge?: string;
-  /** Selling price per size, from the product's variants. Absent in the built-in defaults. */
-  prices?: Partial<Record<Size, number>>;
+  /** Selling price per size in ml, from the product's variants. Absent in the built-in defaults. */
+  prices?: Record<number, number>;
   /** Tracked sizes with no stock left. */
   soldOut?: Size[];
 };
@@ -14,11 +15,21 @@ export const products: Product[] = [
   { id: 'aurora', name: 'Aurora', family: 'Floral', mood: 'Soft light. A new beginning.', price: 4999, image: '/images/aurora.png', color: '#c0a47d', badge: 'DISCOVER', description: 'The feeling of the first light on your skin. Luminous florals unfold around a delicate heart of jasmine, grounded by a soft, lingering base of sandalwood.', notes: [['Mandarin', 'Pear'], ['Jasmine', 'Magnolia'], ['Sandalwood', 'White musk']] },
   { id: 'citrus-bloom', name: 'Citrus Bloom', family: 'Citrus', mood: 'Bright days. Endless possibility.', price: 4499, image: '/images/citrus.png', color: '#6b7047', description: 'A little sunshine, bottled. Fresh bergamot and green leaves meet an uplifting orange blossom heart. An effortless companion for wherever the day takes you.', notes: [['Bergamot', 'Lemon'], ['Neroli', 'Orange blossom'], ['Cedar', 'Musk']] },
 ];
-export const sizes = [50, 100, 200] as const;
-export type Size = typeof sizes[number];
-/** The standard price ladder: 100 ml and 200 ml cost a fixed amount more than 50 ml. */
+/** Bottle size in ml. Each product has its own sizes, set in the admin. */
+export type Size = number;
+/** The sizes a new database starts with, on the price ladder below. */
+export const defaultSizes: Size[] = [50, 100, 200];
 export const ladderPrice = (base: number, size: Size) => base + (size === 100 ? 2000 : size === 200 ? 5000 : 0);
-export const priceFor = (p: Pick<Product, 'price' | 'prices'>, size: Size) => p.prices?.[size] ?? ladderPrice(p.price, size);
+/** The sizes a product is sold in, smallest first. */
+export const sizesOf = (p: Pick<Product, 'prices'>): Size[] => p.prices ? Object.keys(p.prices).map(Number).sort((a, b) => a - b) : defaultSizes;
+export const priceFor = (p: Pick<Product, 'price' | 'prices'>, size: Size) => p.prices ? p.prices[size] ?? 0 : ladderPrice(p.price, size);
+/** The size shown first: the smallest one still in stock. */
+export const firstSize = (p: Pick<Product, 'prices' | 'soldOut'>) => { const all = sizesOf(p); return all.find(s => !p.soldOut?.includes(s)) ?? all[0]; };
+/** The lowest price the product sells for, with its size, for "from" prices. */
+export function fromPrice(p: Pick<Product, 'price' | 'prices'>) {
+  const all = sizesOf(p), prices = all.map(s => priceFor(p, s)), low = Math.min(...prices);
+  return { price: low, size: all[prices.indexOf(low)] };
+}
 export const money = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 export const families: { name: Family; description: string; image: string; number: string }[] = [
   { name: 'Oud', description: 'Rich. Bold. Unforgettable.', image: '/images/legacy.png', number: '01' },

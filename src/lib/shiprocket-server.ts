@@ -11,11 +11,11 @@ import { config, shiprocketEnabled } from './config';
 const API = 'https://apiv2.shiprocket.in/v1/external';
 const TOKEN_KEY = 'shiprocket_token';
 
-/** Packed weight (kg) of one bottle by size, and the box it ships in (cm). */
-const BOTTLE_KG: Record<number, number> = { 50: 0.3, 100: 0.45, 200: 0.7 };
+/** Packed weight (kg) of one bottle by its size in ml (glass and box plus the liquid: 50 ml ≈ 0.33 kg), and the box it ships in (cm). */
+const bottleKg = (ml: number) => 0.2 + ml * 0.0025;
 const BOX = { length: 15, breadth: 10, height: 8 };
 export const parcelWeight = (lines: { size: number; quantity: number }[]) =>
-  Math.max(0.1, Math.round(lines.reduce((kg, l) => kg + (BOTTLE_KG[l.size] ?? 0.5) * l.quantity, 0) * 100) / 100);
+  Math.max(0.1, Math.round(lines.reduce((kg, l) => kg + bottleKg(l.size) * l.quantity, 0) * 100) / 100);
 const parcelBox = (units: number) => ({ ...BOX, height: BOX.height * Math.min(Math.max(units, 1), 4) });
 
 export class ShiprocketError extends Error {}

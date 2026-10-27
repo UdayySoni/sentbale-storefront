@@ -6,7 +6,7 @@ import { db, schema as s, type Db as Database, type Tx } from '@/db';
 import { ensureCatalogSeeded } from '@/db/seed';
 import { issueInvite, type Admin } from '@/lib/admin-auth';
 import { recordAudit } from '@/lib/audit-server';
-import { products as builtInProducts, sizes } from '@/lib/catalog';
+import { products as builtInProducts } from '@/lib/catalog';
 import { updateOrderIn, type OrderStatus, type PaymentStatus } from '@/lib/commerce-server';
 import { config, shiprocketEnabled } from '@/lib/config';
 import { queueMail, type Mail } from '@/lib/mail-server';
@@ -26,7 +26,7 @@ type RecordList = typeof RECORD_LISTS[number];
 const isRecordList = (list: string): list is RecordList => (RECORD_LISTS as readonly string[]).includes(list);
 const TABLE_LISTS = ['products', 'skus', 'collections', 'orders', 'customers', 'team', 'enquiries'];
 const SEEDED = 'admin_seeded', CLAIMED = 'admin_workspace_claimed';
-const DRAFT_COLOR = '#7a6a55';
+const DEFAULT_COLOR = '#7a6a55';
 const BUILT_IN = new Set(builtInProducts.map(p => p.id));
 const ORDER_STATUSES = ['Pending payment', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Refunded'] as const;
 const PAYMENT_STATUSES = ['Paid', 'Pending', 'Failed', 'Refunded'] as const;
@@ -36,13 +36,15 @@ const PAYMENT_STATUSES = ['Paid', 'Pending', 'Failed', 'Refunded'] as const;
 const text = (max: number) => z.string().trim().min(1).max(max);
 const id = z.string().min(1).max(100);
 const email = z.string().trim().toLowerCase().max(254).regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, 'Enter a valid email address');
+const notes = z.array(z.string().trim().min(1).max(80)).max(10);
 const productSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]{1,80}$/), name: text(150), family: z.enum(['Oud', 'Woody', 'Floral', 'Citrus']), mood: text(150),
-  description: text(3000), price: z.number().int().min(1).max(1000000), image: z.string().refine(isAllowedMediaSource),
+  id: z.string().regex(/^[a-z0-9-]{1,80}$/), name: text(150), family: text(40), mood: text(150),
+  description: text(3000), image: z.string().refine(isAllowedMediaSource, 'choose an uploaded image'),
+  color: z.string().regex(/^#[0-9a-f]{6}$/i).default(DEFAULT_COLOR), notes: z.tuple([notes, notes, notes]).default([[], [], []]),
   badge: z.string().max(50).optional(), status: z.enum(['Active', 'Draft']),
 });
 const skuSchema = z.object({
-  id, productId: id, size: z.union([z.literal(sizes[0]), z.literal(sizes[1]), z.literal(sizes[2])]), sku: text(30), price: z.number().int().min(1).max(1000000),
+  id, productId: id, size: z.number().int().min(1, 'sizes are 1 ml or more').max(10000), sku: text(30), price: z.number().int().min(1).max(1000000),
   stock: z.number().int().min(-100000).max(100000), threshold: z.number().int().min(0).max(1000),
 }).refine(v => v.id === `${v.productId}-${v.size}`, 'Sizes keep the id of their product and size.');
 const collectionSchema = z.object({
@@ -136,7 +138,7 @@ export async function readWorkspace(admin: Admin): Promise<Db> {
   return {
     ...(lists as Pick<Db, RecordList>),
     version: DB_VERSION,
-    products: productRows.filter(p => !BUILT_IN.has(p.id)).map((p): AdminProduct => ({ id: p.id, name: p.name, family: p.family as AdminProduct['family'], mood: p.mood, description: p.description, price: p.price, image: p.image, ...(p.badge ? { badge: p.badge } : {}), status: p.published ? 'Active' : 'Draft' })),
+    products: productRows.map((p): AdminProduct => ({ id: p.id, name: p.name, family: p.family, mood: p.mood, description: p.description, price: p.price, image: p.image, color: p.color, notes: p.notes, ...(p.badge ? { badge: p.badge } : {}), status: p.published ? 'Active' : 'Draft' })),
     skus: can('skus') || allows(access, 'dashboard', 'view') ? skus : [],
     collections: collectionRows.map((c): Collection => ({ id: c.id, name: c.name, description: c.description, position: c.position, featured: c.featured, status: c.status === 'Hidden' ? 'Hidden' : 'Visible' })),
     // Roles that only see the dashboard get totals and dates, never who the customers are.
@@ -162,19 +164,31 @@ export async function importable() {
 
 async function upsertProduct(tx: Tx, row: unknown) {
   const p = parse(productSchema, row, 'product');
-  if (BUILT_IN.has(p.id)) throw new WorkspaceError('Storefront products are edited from the product form.');
-  const values = { name: p.name, family: p.family, mood: p.mood, description: p.description, price: p.price, image: p.image, badge: p.badge || null, status: p.status, published: p.status === 'Active', updatedAt: new Date() };
-  await tx.insert(s.products).values({ id: p.id, position: 1000, color: DRAFT_COLOR, notes: [[], [], []], ...values })
+  // `price` is not taken from the admin: it follows the product's cheapest size (see settleProducts).
+  const values = { name: p.name, family: p.family, mood: p.mood, description: p.description, image: p.image, color: p.color, notes: p.notes, badge: p.badge || null, status: p.status, published: p.status === 'Active', updatedAt: new Date() };
+  await tx.insert(s.products).values({ id: p.id, position: 1000, price: 1, ...values })
     .onConflictDoUpdate({ target: s.products.id, set: values });
+  return p.id;
 }
 
 async function upsertSku(tx: Tx, row: unknown) {
-  const v = parse(skuSchema, row, 'stock');
-  const [product] = await tx.select({ id: s.products.id, published: s.products.published }).from(s.products).where(eq(s.products.id, v.productId));
+  const v = parse(skuSchema, row, 'size');
+  const [product] = await tx.select({ id: s.products.id }).from(s.products).where(eq(s.products.id, v.productId));
   if (!product) throw new WorkspaceError('That product no longer exists. Reload the page.');
   const values = { sku: v.sku, price: v.price, stock: v.stock, threshold: v.threshold, updatedAt: new Date() };
   await tx.insert(s.productVariants).values({ id: v.id, productId: v.productId, size: v.size, ...values }).onConflictDoUpdate({ target: s.productVariants.id, set: values });
-  return product.published;
+  return v.productId;
+}
+
+/** Every product touched by a save keeps at least one size, and its list price follows its cheapest size. */
+async function settleProducts(tx: Tx, ids: Set<string>) {
+  for (const productId of ids) {
+    const [product] = await tx.select({ name: s.products.name }).from(s.products).where(eq(s.products.id, productId));
+    if (!product) continue;
+    const [{ low }] = await tx.select({ low: sql<number | null>`min(${s.productVariants.price})` }).from(s.productVariants).where(eq(s.productVariants.productId, productId));
+    if (low === null) throw new WorkspaceError(`Give ${product.name} at least one size.`);
+    await tx.update(s.products).set({ price: Number(low) }).where(eq(s.products.id, productId));
+  }
 }
 
 async function upsertCollection(tx: Tx, row: unknown) {
@@ -302,18 +316,22 @@ export async function applyChanges(admin: Admin, changes: Changes) {
     await claim(tx);
     let catalogChanged = false;
     const notices: string[] = [];
+    const touched = new Set<string>();
     // Products first, so sizes created alongside a new product have it to belong to.
     const order = ['products', ...Object.keys(changes.lists).filter(list => list !== 'products')];
     for (const list of order) {
       const change = changes.lists[list];
       if (!change || list === 'audit') continue;
       if (list === 'products') {
-        for (const row of change.upsert) { await upsertProduct(tx, row); catalogChanged = true; }
-        const doomed = change.remove.filter(id => !BUILT_IN.has(id));
-        if (doomed.length) { await tx.delete(s.products).where(inArray(s.products.id, doomed)); catalogChanged = true; }
+        for (const row of change.upsert) { touched.add(await upsertProduct(tx, row)); catalogChanged = true; }
+        if (change.remove.length) { await tx.delete(s.products).where(inArray(s.products.id, change.remove)); catalogChanged = true; }
       } else if (list === 'skus') {
-        for (const row of change.upsert) if (await upsertSku(tx, row)) catalogChanged = true;
-        // Sizes are removed only with their product.
+        for (const row of change.upsert) { touched.add(await upsertSku(tx, row)); catalogChanged = true; }
+        if (change.remove.length) {
+          const gone = await tx.delete(s.productVariants).where(inArray(s.productVariants.id, change.remove)).returning({ productId: s.productVariants.productId });
+          for (const v of gone) touched.add(v.productId);
+          catalogChanged = true;
+        }
       } else if (list === 'collections') {
         for (const row of change.upsert) await upsertCollection(tx, row);
         if (change.remove.length) await tx.delete(s.collections).where(inArray(s.collections.id, change.remove));
@@ -338,6 +356,7 @@ export async function applyChanges(admin: Admin, changes: Changes) {
       if (data === undefined) continue;
       await tx.insert(s.adminSettings).values({ key, data }).onConflictDoUpdate({ target: s.adminSettings.key, set: { data, updatedAt: new Date() } });
     }
+    await settleProducts(tx, touched);
     if (changes.audit) await recordAudit(tx, admin.name, changes.audit.action, changes.audit.target);
     if (catalogChanged) await touchCatalog(tx);
     return { catalogChanged, notices };

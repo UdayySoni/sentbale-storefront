@@ -3,7 +3,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { ArrowDownRight, ArrowRight, ArrowUpRight, Box, FileText, IndianRupee, LayoutGrid, Package, ShoppingBag, Tag, Users, type LucideIcon } from 'lucide-react';
-import { useProducts } from '@/components/catalog-provider';
 import { useMediaImage } from '@/components/media-provider';
 import { money } from '@/lib/catalog';
 import { useDb } from '@/lib/admin/store';
@@ -105,7 +104,6 @@ const quickActions: [string, string, LucideIcon][] = [
 
 export default function Dashboard({ name }: { name: string }) {
   const db = useDb();
-  const live = useProducts();
   const hero = useMediaImage('hero.desktop', '/images/hero.png', '');
   // One clock reading per data change keeps every widget on the same "now".
   const now = useMemo(() => Date.now(), [db]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -113,7 +111,7 @@ export default function Dashboard({ name }: { name: string }) {
     if (!db) return null;
     const sales = db.orders.filter(counted);
     const orderTimes = db.orders.map(o => new Date(o.date).getTime());
-    const images = new Map([...live, ...db.products].map(p => [p.id, p.image]));
+    const images = new Map(db.products.map(p => [p.id, p.image]));
     const sold = new Map<string, number>();
     for (const order of sales) sold.set(order.skuId, (sold.get(order.skuId) || 0) + order.qty);
     return {
@@ -131,7 +129,7 @@ export default function Dashboard({ name }: { name: string }) {
       }, new Map<string, { sku: Db['skus'][number]; best: number; sold: number; image?: string }>()).values()].filter(row => row.sold).sort((a, b) => b.sold - a.sold).slice(0, 5),
       low: db.skus.filter(isLowStock).sort((a, b) => a.stock - b.stock).slice(0, 5).map(sku => ({ sku, image: images.get(sku.productId) })),
     };
-  }, [db, live, now]);
+  }, [db, now]);
   if (!db || !stats) return <Loading />;
 
   return <div className="adm-dashboard">
@@ -144,7 +142,7 @@ export default function Dashboard({ name }: { name: string }) {
       <Stat icon={ShoppingBag} label="Total Orders" value={db.orders.length.toLocaleString('en-IN')} change={stats.orders.change} weeks={stats.orders.weeks} href="/admin/orders" />
       <Stat icon={Users} label="Total Customers" value={db.customers.length.toLocaleString('en-IN')} change={stats.customers.change} weeks={stats.customers.weeks} href="/admin/customers" />
       <Stat icon={IndianRupee} label="Total Revenue" value={money(stats.revenueTotal)} change={stats.revenue.change} weeks={stats.revenue.weeks} href="/admin/payments" />
-      <Stat icon={Package} label="Total Products" value={String(db.skus.length)} note={`sizes across ${live.length + db.products.length} fragrance${live.length + db.products.length === 1 ? '' : 's'}`} href="/admin/inventory" />
+      <Stat icon={Package} label="Total Products" value={String(db.skus.length)} note={`sizes across ${db.products.length} fragrance${db.products.length === 1 ? '' : 's'}`} href="/admin/inventory" />
     </div>
 
     <div className="adm-row two">

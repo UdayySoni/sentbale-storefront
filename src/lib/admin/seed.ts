@@ -1,4 +1,4 @@
-import { articles, families, priceFor, products as liveProducts, sizes } from '@/lib/catalog';
+import { articles, defaultSizes, families, priceFor, products as liveProducts } from '@/lib/catalog';
 import { permissionSections } from './nav';
 import type { Access, Db, Role, Sku } from './types';
 
@@ -8,7 +8,7 @@ export const DB_VERSION = 2;
 export const slug = (name: string) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 export const skuCode = (name: string, size: number) => `SB-${name.replace(/[^a-z]/gi, '').slice(0, 3).toUpperCase()}-${size}`;
 export function skusFor(product: { id: string; name: string; price: number }, threshold = 10): Sku[] {
-  return sizes.map(size => ({ id: `${product.id}-${size}`, productId: product.id, product: product.name, size, sku: skuCode(product.name, size), price: priceFor(product, size), stock: 0, threshold }));
+  return defaultSizes.map(size => ({ id: `${product.id}-${size}`, productId: product.id, product: product.name, size, sku: skuCode(product.name, size), price: priceFor(product, size), stock: 0, threshold }));
 }
 
 /**

@@ -99,3 +99,35 @@ body{font-size:14px;-webkit-font-smoothing:antialiased}
 }
 @media(max-width:370px){.header .wordmark{font-size:21px;letter-spacing:3px}.hero h1{font-size:57px}.cart-thumb{width:60px;height:85px}.cart-line{gap:9px}.cart-line-price{font-size:11px}.product-meta h3{font-size:26px}.product-family{font-size:7px}.detail-buy>.button{font-size:9px;gap:6px}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+
+/* Typography: Playfair Display headings, DM Sans reading text, Jost labels. Small text is kept at readable sizes on every screen. */
+body{font-size:14px}
+h1,h2,h3,.wordmark{font-size-adjust:.43}
+em{font-style:italic}
+.eyebrow,.button,.text-link,.header nav>a,.announcement,.product-family,.quick-add,.footer-main h3,.filter-tabs>button,.size-selector button,.breadcrumbs,.result-count,.status-pill{font-family:var(--label)}
+.eyebrow{font-size:11px;font-weight:500;letter-spacing:2.2px}
+.button{font-size:12px;font-weight:500;letter-spacing:1.6px}
+.text-link{font-size:12.5px;font-weight:500;letter-spacing:.4px}
+.header nav>a{font-size:13px;letter-spacing:.6px}
+.announcement,.announcement>button{font-size:11px;letter-spacing:1px}
+.product-family{font-size:10px;letter-spacing:1.6px}
+.product-mood{font-size:13px}
+.product-price{font-size:14px;font-weight:500}
+.product-price small{font-size:11px}
+.quick-add{font-size:11.5px;letter-spacing:1px}
+.collection-caption>p{font-size:12px}
+.detail-description,.tab-content{font-size:15px;line-height:1.8}
+.hero-copy>p:not(.eyebrow){font-size:15px;font-weight:400}
+.summary-row{font-size:14px}
+.field{font-size:12.5px}
+.footer-main h3{font-size:11px;letter-spacing:2px}
+.footer-main a,.footer-top p:not(.eyebrow){font-size:13px}
+.breadcrumbs,.result-count,.filter-tabs>button{font-size:12px}
+.size-selector button{font-size:13px}
+.cart-line-copy p,.checkout-item p,.shipping-options small,.demo-notice{font-size:12.5px}
+.muted,.checkout-note{font-size:13px}
+@media(max-width:700px){body{font-size:14px}.eyebrow{font-size:10px;letter-spacing:1.8px}.button{font-size:11.5px}.product-family{font-size:9px;letter-spacing:1.2px}.product-mood{font-size:12px}.product-price{font-size:13px}.collection-caption>p{font-size:11px}.detail-description,.tab-content{font-size:14.5px}}
+.hero-copy h1+.button{margin-top:40px}
+.detail-buy+.notes-mini{margin-top:30px;padding-top:24px;border-top:1px solid var(--line)}
+.size-heading span,.detail-price span{font-size:12px}
+@media(max-width:700px){.hero-copy h1+.button{margin-top:30px}}
