@@ -43,6 +43,20 @@
       "when": 1793036800968,
       "tag": "0005_shiprocket",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793350947444,
+      "tag": "0006_gift_baskets",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793355847818,
+      "tag": "0007_gallery_shipping",
+      "breakpoints": true
     }
   ]
 }

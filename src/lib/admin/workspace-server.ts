@@ -7,12 +7,12 @@ import { ensureCatalogSeeded } from '@/db/seed';
 import { issueInvite, type Admin } from '@/lib/admin-auth';
 import { recordAudit } from '@/lib/audit-server';
 import { products as builtInProducts } from '@/lib/catalog';
-import { updateOrderIn, type OrderStatus, type PaymentStatus } from '@/lib/commerce-server';
+import { giftSummary, updateOrderIn, type OrderStatus, type PaymentStatus } from '@/lib/commerce-server';
 import { config, shiprocketEnabled } from '@/lib/config';
 import { queueMail, type Mail } from '@/lib/mail-server';
 import { isAllowedMediaSource } from '@/lib/media';
 import { setting } from '@/lib/records-server';
-import { sendToShiprocket } from '@/lib/shiprocket-server';
+import { sendToShiprocket, trackingUrl } from '@/lib/shiprocket-server';
 import { accessFor, allows, isOwner, type AccessMap } from './access-server';
 import { DB_VERSION, seed } from './seed';
 import type { AdminProduct, AuditEntry, Collection, Customer, Db, Enquiry, Homepage, Member, Order, Row, Settings, Sku } from './types';
@@ -21,7 +21,7 @@ import type { AdminProduct, AuditEntry, Collection, Customer, Db, Enquiry, Homep
 export class WorkspaceError extends Error {}
 
 /** Sections stored as generic records (coupons, journal, shipping, payment methods, roles, reviews). */
-const RECORD_LISTS = ['coupons', 'reviews', 'posts', 'zones', 'partners', 'methods', 'roles'] as const;
+const RECORD_LISTS = ['baskets', 'coupons', 'reviews', 'posts', 'zones', 'partners', 'methods', 'roles'] as const;
 type RecordList = typeof RECORD_LISTS[number];
 const isRecordList = (list: string): list is RecordList => (RECORD_LISTS as readonly string[]).includes(list);
 const TABLE_LISTS = ['products', 'skus', 'collections', 'orders', 'customers', 'team', 'enquiries'];
@@ -40,6 +40,7 @@ const notes = z.array(z.string().trim().min(1).max(80)).max(10);
 const productSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]{1,80}$/), name: text(150), family: text(40), mood: text(150),
   description: text(3000), image: z.string().refine(isAllowedMediaSource, 'choose an uploaded image'),
+  images: z.array(z.string().refine(isAllowedMediaSource, 'choose uploaded images')).max(12, 'use up to 13 photos').default([]),
   color: z.string().regex(/^#[0-9a-f]{6}$/i).default(DEFAULT_COLOR), notes: z.tuple([notes, notes, notes]).default([[], [], []]),
   badge: z.string().max(50).optional(), status: z.enum(['Active', 'Draft']),
 });
@@ -48,7 +49,7 @@ const skuSchema = z.object({
   stock: z.number().int().min(-100000).max(100000), threshold: z.number().int().min(0).max(1000),
 }).refine(v => v.id === `${v.productId}-${v.size}`, 'Sizes keep the id of their product and size.');
 const collectionSchema = z.object({
-  id, name: text(60), description: z.string().max(300).default(''), position: z.number().int().min(1).max(99),
+  id, name: text(60), description: z.string().max(300).default(''), image: z.string().refine(v => !v || isAllowedMediaSource(v), 'choose an uploaded image').default(''), position: z.number().int().min(1).max(99),
   featured: z.boolean(), status: z.enum(['Visible', 'Hidden']),
 });
 const customerSchema = z.object({
@@ -86,7 +87,7 @@ async function ensureWorkspaceSeeded(database: Database | Tx) {
     const [first] = await tx.insert(s.meta).values({ key: SEEDED, value: new Date().toISOString() }).onConflictDoNothing().returning();
     if (!first) return;
     const start = seed();
-    const records = (['roles', 'posts'] as const).flatMap(list => (start[list] as Row[]).map(row => ({ list, id: row.id, data: row })));
+    const records = (['roles', 'posts', 'baskets'] as const).flatMap(list => (start[list] as Row[]).map(row => ({ list, id: row.id, data: row })));
     await tx.insert(s.adminRecords).values(records).onConflictDoNothing();
     await tx.insert(s.adminSettings).values([{ key: 'homepage', data: start.homepage }, { key: 'settings', data: start.settings }, { key: 'seen', data: start.seen }]).onConflictDoNothing();
   });
@@ -103,6 +104,9 @@ function adminOrder(o: typeof s.orders.$inferSelect, items: (typeof s.orderItems
     status: o.status as Order['status'], payment: o.paymentMethod || o.paymentProvider, paid: o.paymentStatus as Order['paid'], date: o.createdAt.toISOString(),
     shipping: o.awb ? [o.courier, o.awb].filter(Boolean).join(' · ') : o.shipRef ? `Shiprocket #${o.shipRef} · ${o.shipStatus || 'NEW'}` : o.shipError ? 'Not sent' : '',
     ...(o.shipError && !o.shipRef ? { shipError: o.shipError } : {}),
+    ...(o.gift ? { gift: giftSummary(o.gift) } : {}),
+    items: items.map(i => `${i.quantity} × ${i.name} ${i.size} ml`),
+    ship: { ref: o.shipRef ?? '', shipmentId: o.shipmentId ?? '', awb: o.awb ?? '', courier: o.courier ?? '', status: o.shipStatus ?? '', error: o.shipError ?? '', syncedAt: o.shipSyncedAt?.toISOString() ?? '', trackingUrl: o.awb ? trackingUrl(o.awb) : '', choice: o.shipChoice ? `${o.delivery === 'express' ? 'Express' : 'Standard'}: ${o.shipChoice.courier}, ₹${o.shipChoice.price}` : '' },
     canShip: shiprocketEnabled() && o.status === 'Processing' && !o.shipRef && !!o.address && o.paymentProvider !== 'test',
   };
 }
@@ -138,9 +142,9 @@ export async function readWorkspace(admin: Admin): Promise<Db> {
   return {
     ...(lists as Pick<Db, RecordList>),
     version: DB_VERSION,
-    products: productRows.map((p): AdminProduct => ({ id: p.id, name: p.name, family: p.family, mood: p.mood, description: p.description, price: p.price, image: p.image, color: p.color, notes: p.notes, ...(p.badge ? { badge: p.badge } : {}), status: p.published ? 'Active' : 'Draft' })),
+    products: productRows.map((p): AdminProduct => ({ id: p.id, name: p.name, family: p.family, mood: p.mood, description: p.description, price: p.price, image: p.image, images: p.images, color: p.color, notes: p.notes, ...(p.badge ? { badge: p.badge } : {}), status: p.published ? 'Active' : 'Draft' })),
     skus: can('skus') || allows(access, 'dashboard', 'view') ? skus : [],
-    collections: collectionRows.map((c): Collection => ({ id: c.id, name: c.name, description: c.description, position: c.position, featured: c.featured, status: c.status === 'Hidden' ? 'Hidden' : 'Visible' })),
+    collections: collectionRows.map((c): Collection => ({ id: c.id, name: c.name, description: c.description, image: c.image ?? '', position: c.position, featured: c.featured, status: c.status === 'Hidden' ? 'Hidden' : 'Visible' })),
     // Roles that only see the dashboard get totals and dates, never who the customers are.
     orders: orderRows.map(o => { const row = adminOrder(o, itemsByOrder.get(o.id) ?? []); return can('orders') ? row : { ...row, customer: 'Customer', email: '', phone: '', address: '' }; }),
     customers: customerRows.map((c): Customer => can('customers')
@@ -165,7 +169,7 @@ export async function importable() {
 async function upsertProduct(tx: Tx, row: unknown) {
   const p = parse(productSchema, row, 'product');
   // `price` is not taken from the admin: it follows the product's cheapest size (see settleProducts).
-  const values = { name: p.name, family: p.family, mood: p.mood, description: p.description, image: p.image, color: p.color, notes: p.notes, badge: p.badge || null, status: p.status, published: p.status === 'Active', updatedAt: new Date() };
+  const values = { name: p.name, family: p.family, mood: p.mood, description: p.description, image: p.image, images: p.images, color: p.color, notes: p.notes, badge: p.badge || null, status: p.status, published: p.status === 'Active', updatedAt: new Date() };
   await tx.insert(s.products).values({ id: p.id, position: 1000, price: 1, ...values })
     .onConflictDoUpdate({ target: s.products.id, set: values });
   return p.id;
@@ -193,7 +197,7 @@ async function settleProducts(tx: Tx, ids: Set<string>) {
 
 async function upsertCollection(tx: Tx, row: unknown) {
   const c = parse(collectionSchema, row, 'collection');
-  const values = { name: c.name, description: c.description, position: c.position, featured: c.featured, status: c.status, updatedAt: new Date() };
+  const values = { name: c.name, description: c.description, image: c.image || null, position: c.position, featured: c.featured, status: c.status, updatedAt: new Date() };
   await tx.insert(s.collections).values({ id: c.id, ...values }).onConflictDoUpdate({ target: s.collections.id, set: values });
 }
 

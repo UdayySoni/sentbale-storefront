@@ -4,6 +4,10 @@ import { Star } from 'lucide-react';
 import { permissionSections } from '@/lib/admin/nav';
 import { patchDb, useDb } from '@/lib/admin/store';
 import { stockLevel, type Access, type Db, type Order, type Row } from '@/lib/admin/types';
+import { slug } from '@/lib/admin/seed';
+import { familyPhoto } from '@/lib/catalog';
+import { Thumb } from './dashboard';
+import Shipments from './shipments';
 import Products from './products';
 import ResourcePage, { type Resource } from './resource';
 import { HomepageContent, BusinessSettings } from './settings';
@@ -20,16 +24,17 @@ const strong = (key: string, sub?: string) => (row: Row) => <span className="adm
 const resources: Record<string, Resource> = {
   collections: {
     list: 'collections', title: 'Collections', noun: 'collection', description: 'Group fragrances into the worlds customers browse.', name: row => row.name, sort: ['position', 'asc'],
-    cols: [{ key: 'name', label: 'Collection', render: strong('name', 'description') }, { key: 'position', label: 'Order', right: true }, { key: 'featured', label: 'Featured', kind: 'bool' }, { key: 'status', label: 'Status', kind: 'badge' }],
+    cols: [{ key: 'name', label: 'Collection', render: row => <div className="adm-product-cell"><Thumb src={row.image || familyPhoto(row.name) || ''} /><span className="adm-cell-main"><b>{row.name}</b><small>{row.description}</small></span></div> }, { key: 'position', label: 'Order', right: true }, { key: 'featured', label: 'Featured', kind: 'bool' }, { key: 'status', label: 'Status', kind: 'badge' }],
     filter: { key: 'status', label: 'Status', options: ['Visible', 'Hidden'] },
-    fields: [{ name: 'name', label: 'Collection name', required: true, maxLength: 60 }, { name: 'description', label: 'Description', type: 'textarea', maxLength: 300 }, { name: 'position', label: 'Display order', type: 'number', min: 1, max: 99, half: true }, { name: 'status', label: 'Status', type: 'select', options: ['Visible', 'Hidden'], half: true }, { name: 'featured', label: 'Feature on the homepage', type: 'toggle' }],
+    fields: [{ name: 'name', label: 'Collection name', required: true, maxLength: 60 }, { name: 'image', label: 'Collection photo', type: 'image', hint: 'A general photo of the family. Products inside show their own photos.' }, { name: 'description', label: 'Description', type: 'textarea', maxLength: 300 }, { name: 'position', label: 'Display order', type: 'number', min: 1, max: 99, half: true }, { name: 'status', label: 'Status', type: 'select', options: ['Visible', 'Hidden'], half: true }, { name: 'featured', label: 'Feature on the homepage', type: 'toggle' }],
     blank: db => ({ position: db.collections.length + 1, status: 'Visible', featured: false }),
+    clean: (row, db) => { if (db.collections.some(c => c.id === row.id)) return row; const id = slug(String(row.name)); return id && !db.collections.some(c => c.id === id) ? { ...row, id } : row; },
     actions: row => [{ label: row.status === 'Visible' ? 'Hide' : 'Show', patch: { status: row.status === 'Visible' ? 'Hidden' : 'Visible' } }],
   },
   orders: {
     list: 'orders', title: 'Orders', noun: 'order', description: 'Track every order from payment to doorstep.', name: row => `#${row.number}`, sort: ['number', 'desc'], remove: false,
     note: 'Storefront orders appear here as they are placed. Orders you add are saved as real orders and take stock. Orders are never deleted: cancel or refund them, and their stock returns to Inventory.',
-    cols: [{ key: 'number', label: 'Order', get: row => row.number, render: row => <b>#{row.number}</b> }, { key: 'customer', label: 'Customer', render: strong('customer', 'email') }, { key: 'item', label: 'Item', get: row => `${row.item} × ${row.qty}` }, { key: 'amount', label: 'Amount', kind: 'money', right: true }, { key: 'payment', label: 'Payment' }, { key: 'status', label: 'Status', kind: 'badge' }, { key: 'shipping', label: 'Shipping', get: row => row.shipping || '', render: row => row.shipError ? <span title={row.shipError}>Not sent · {row.shipError.slice(0, 60)}</span> : row.shipping || '—' }, { key: 'date', label: 'Date', kind: 'date' }],
+    cols: [{ key: 'number', label: 'Order', get: row => row.number, render: row => <b>#{row.number}</b> }, { key: 'customer', label: 'Customer', render: strong('customer', 'email') }, { key: 'item', label: 'Item', get: row => `${row.item} × ${row.qty}`, render: row => <span className="adm-cell-main"><span>{row.item} × {row.qty}</span>{row.gift && <small className="adm-gift">🎁 {row.gift}</small>}</span> }, { key: 'amount', label: 'Amount', kind: 'money', right: true }, { key: 'payment', label: 'Payment' }, { key: 'status', label: 'Status', kind: 'badge' }, { key: 'shipping', label: 'Shipping', get: row => row.shipping || '', render: row => row.shipError ? <span title={row.shipError}>Not sent · {row.shipError.slice(0, 60)}</span> : row.shipping || '—' }, { key: 'date', label: 'Date', kind: 'date' }],
     filter: { key: 'status', label: 'Status', options: ['Pending payment', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Refunded'] },
     fields: [{ name: 'customer', label: 'Customer name', required: true, maxLength: 100 }, { name: 'email', label: 'Customer email', type: 'email', required: true }, { name: 'item', label: 'Item', type: 'select', options: db => db.skus.map(skuLabel) }, { name: 'qty', label: 'Quantity', type: 'number', min: 1, max: 10, half: true }, { name: 'payment', label: 'Payment method', type: 'select', options: db => db.methods.length ? db.methods.map(method => method.name) : ['UPI', 'Card', 'Net Banking', 'COD'], half: true }, { name: 'status', label: 'Order status', type: 'select', options: ['Pending payment', 'Processing', 'Shipped', 'Delivered', 'Cancelled', 'Refunded'], half: true }, { name: 'paid', label: 'Payment status', type: 'select', options: ['Paid', 'Pending', 'Failed', 'Refunded'], half: true }],
     blank: db => ({ number: Math.max(1000, ...db.orders.map(order => order.number)) + 1, item: db.skus[0] ? skuLabel(db.skus[0]) : '', qty: 1, payment: db.methods[0]?.name || 'UPI', status: 'Processing', paid: 'Paid', date: today() }),
@@ -89,6 +94,13 @@ const resources: Record<string, Resource> = {
     clean: row => ({ ...row, date: today() }),
     actions: row => [{ label: row.status === 'Published' ? 'Unpublish' : 'Publish', patch: { status: row.status === 'Published' ? 'Draft' : 'Published', date: today() } }],
     note: 'Published posts appear in the storefront journal straight away, newest first; drafts stay hidden.',
+  },
+  gifts: {
+    list: 'baskets', title: 'Gift Baskets', noun: 'gift basket', description: 'The baskets customers can choose in the gift builder, and what each adds to the order.', name: row => row.name,
+    cols: [{ key: 'name', label: 'Basket', render: row => <div className="adm-product-cell"><Thumb src={row.image || ''} /><span className="adm-cell-main"><b>{row.name}</b><small>{row.description}</small></span></div> }, { key: 'price', label: 'Extra charge', kind: 'money', right: true }, { key: 'status', label: 'Status', kind: 'badge' }],
+    fields: [{ name: 'name', label: 'Basket name', required: true, maxLength: 60 }, { name: 'image', label: 'Basket photo', type: 'image' }, { name: 'description', label: 'Short description', maxLength: 120 }, { name: 'price', label: 'Extra charge (₹)', type: 'number', min: 0, max: 100000, half: true }, { name: 'status', label: 'Status', type: 'select', options: ['Active', 'Paused'], half: true }],
+    blank: () => ({ description: '', price: 199, status: 'Active' }),
+    actions: row => [{ label: row.status === 'Active' ? 'Pause' : 'Activate', patch: { status: row.status === 'Active' ? 'Paused' : 'Active' } }],
   },
   zones: {
     list: 'zones', title: 'Shipping', noun: 'shipping zone', description: 'Where you deliver, how fast, and what it costs.', name: row => row.name,
@@ -172,6 +184,7 @@ const tabbed: Record<string, { key: string; label: string }[]> = {
 export default function Section({ section }: { section: string }) {
   const params = useSearchParams();
   if (section === 'products') return <Products />;
+  if (section === 'shipments') return <Shipments />;
   if (section === 'homepage') return <HomepageContent />;
   if (section === 'settings') return <BusinessSettings />;
   const tabs = tabbed[section];

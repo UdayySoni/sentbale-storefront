@@ -12,7 +12,7 @@ test('admin uploads, saves and shares a product image across browser sessions', 
     await expect(page.getByRole('heading', { name: 'Image studio.' })).toBeVisible();
     await expect(page.locator('.admin-slot-list button')).toHaveCount(18);
     await page.locator('.admin-slot-list button').filter({ hasText: 'Legacy' }).click();
-    await page.getByLabel('Upload image').setInputFiles('public/images/citrus.png');
+    await page.getByLabel('Upload images').setInputFiles('public/images/citrus.png');
     await expect(page.locator('.admin-message[role=status]')).toContainText('Image uploaded');
     uploaded = await page.locator('.admin-image-preview>img').getAttribute('src') || '';
     expect(uploaded).toMatch(/^\/api\/media\/files\/[a-f0-9-]+\.png$/);

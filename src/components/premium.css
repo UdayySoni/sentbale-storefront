@@ -131,3 +131,47 @@ em{font-style:italic}
 .detail-buy+.notes-mini{margin-top:30px;padding-top:24px;border-top:1px solid var(--line)}
 .size-heading span,.detail-price span{font-size:12px}
 @media(max-width:700px){.hero-copy h1+.button{margin-top:30px}}
+
+/* Gift builder */
+.gift-section{scroll-margin-top:20px;background:var(--cream)}
+.gift-steps{display:flex;gap:26px;list-style:none;margin:0 0 26px;padding:0;flex-wrap:wrap}
+.gift-steps button{display:inline-flex;align-items:center;gap:9px;background:none;border:0;padding:0;font-family:var(--label);font-size:13px;letter-spacing:.6px;color:var(--muted)}
+.gift-steps button:disabled{cursor:default}
+.gift-steps span{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid #bdb5a3;border-radius:50%;font-size:12px}
+.gift-steps .current button{color:var(--ink);font-weight:500}.gift-steps .current span,.gift-steps .done span{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.gift-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(280px,1fr);gap:5%;align-items:start}
+.gift-products{display:grid;gap:10px}
+.gift-product{display:flex;align-items:center;gap:14px;padding:10px;background:var(--paper);border:1px solid var(--line)}
+.gift-thumb{position:relative;width:64px;height:64px;flex-shrink:0;overflow:hidden}.gift-thumb .photo{object-fit:cover}
+.gift-product-copy{flex:1;min-width:0}.gift-product-copy h3{font-size:24px;line-height:1.2}
+.gift-product-copy select{margin-top:4px;max-width:100%;background:transparent;border:0;border-bottom:1px solid #cec7b8;padding:3px 0;font-size:13px;color:var(--ink)}
+.gift-add{display:inline-flex;align-items:center;gap:7px;min-height:44px;padding:0 15px;background:none;border:1px solid var(--ink);font-family:var(--label);font-size:12.5px;letter-spacing:.6px;white-space:nowrap}
+.gift-add:hover:not(:disabled){background:var(--ink);color:var(--paper)}.gift-add:disabled{opacity:.5;cursor:default;border-color:#bdb5a3}
+.gift-baskets{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.gift-baskets label{position:relative;display:flex;flex-direction:column;gap:6px;padding:18px;background:var(--paper);border:1px solid var(--line);cursor:pointer}
+.gift-baskets input,.gift-card-designs input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.gift-baskets label.selected{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}.gift-baskets label:focus-within,.gift-card-designs label:focus-within{outline:2px solid #b49a6d;outline-offset:2px}
+.gift-baskets strong{font-family:var(--serif);font-size:20px;font-weight:400;font-size-adjust:.43;line-height:1.2}.gift-baskets small{font-size:12.5px;color:var(--muted);line-height:1.4}.gift-baskets span{margin-top:auto;padding-top:8px;font-size:14px;font-weight:500}
+.gift-card-form{display:grid;gap:14px}
+.gift-card-designs{display:flex;gap:10px;flex-wrap:wrap}.gift-card-designs label{position:relative;min-width:88px;min-height:44px;display:flex;align-items:center;justify-content:center;padding:0 14px;font-family:var(--label);font-size:13px;cursor:pointer;border:1px solid transparent}.gift-card-designs label.selected{box-shadow:0 0 0 2px var(--paper),0 0 0 4px var(--ink)}
+.gift-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:22px}.gift-actions .button{margin-left:auto}
+.gift-preview{padding:22px;background:var(--paper);border:1px solid var(--line)}
+.gift-card{margin-bottom:16px;padding:22px;min-height:190px;display:flex;flex-direction:column;gap:3px;overflow-wrap:anywhere}
+.gift-card small{font-family:var(--label);font-size:10.5px;letter-spacing:1.8px;text-transform:uppercase;opacity:.75}.gift-card strong{font-family:var(--serif);font-weight:400;font-size:19px}
+.gift-card p{flex:1;margin:12px 0;font-family:var(--serif);font-style:italic;font-size:15px;line-height:1.5;white-space:pre-wrap}
+.gift-card-classic{background:#f1e6d2;color:#3b2d1b}.gift-card-floral{background:#e9dfd9;color:#55323a}.gift-card-noir{background:#23241f;color:#efe6d3}
+.gift-line h3,.gift-item h3{display:flex;align-items:center;gap:8px}.gift-line{background:var(--cream);padding-left:14px;padding-right:14px}
+@media(max-width:850px){.gift-layout{grid-template-columns:1fr;gap:22px}}
+@media(max-width:700px){.gift-steps{gap:14px}.gift-product{gap:10px;padding:8px}.gift-thumb{width:52px;height:52px}.gift-product-copy h3{font-size:21px}.gift-add{padding:0 11px}}
+.cart-line.gift-line{padding:16px 14px;align-items:flex-start}.cart-line.gift-line .cart-line-copy h3{font-size:22px}.cart-line.gift-line .cart-line-copy p{font-size:12.5px;line-height:1.5;margin-top:5px}.cart-line.gift-line .save-later{font-size:12px;margin-top:8px}.cart-line.gift-line .cart-line-price strong{font-size:14px}.gift-item{display:block}.gift-item p{font-size:12.5px;margin-top:4px}
+.checkout-page>h1{margin-bottom:28px}
+
+/* Product photos and basket photos */
+.detail-gallery{align-self:start;min-width:0}
+.detail-thumbs{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.detail-thumbs button{position:relative;width:76px;height:76px;padding:0;border:1px solid var(--line);overflow:hidden;background:#ddd4c3}
+.detail-thumbs button.selected{border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.gift-basket-photo{position:relative;display:block;height:130px;margin:-18px -18px 8px;overflow:hidden;background:var(--cream)}
+.gift-baskets .gift-basket-photo{padding:0;margin-top:-18px}
+.gift-baskets .gift-basket-price{margin-top:auto;padding-top:8px;font-size:14px;font-weight:500}
+.detail-copy .size-heading span{font-size:12px}

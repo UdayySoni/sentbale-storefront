@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db, schema } from '@/db';
 import { currentUser } from '@/lib/accounts-server';
-import { cartItems, CheckoutError, placeOrder, updateOrder, type PaymentChoice } from '@/lib/commerce-server';
+import { CheckoutError, giftInput, orderLines, placeOrder, updateOrder, type PaymentChoice } from '@/lib/commerce-server';
 import { config, razorpayEnabled, shiprocketEnabled, testPaymentsEnabled } from '@/lib/config';
 import { toDemoOrder } from '@/lib/orders-server';
 import { createRazorpayOrder } from '@/lib/razorpay-server';
@@ -18,7 +18,8 @@ export async function POST(request: Request) {
     const body = await request.json();
     const requestId = text(body?.requestId, 100);
     if (!requestId) throw new CheckoutError('Invalid request.');
-    const items = cartItems(body.items);
+    const gift = giftInput(body.gift);
+    const items = orderLines(body.items, gift);
     const address = body.address ?? {};
     const [line, city, state, pincode] = [text(address.line, 250), text(address.city, 250), text(address.state, 250), text(address.pincode, 6)];
     if (!line || !city || !state || !pincode || !/^[1-9][0-9]{5}$/.test(pincode)) throw new CheckoutError('Enter a valid delivery address.');
@@ -29,7 +30,7 @@ export async function POST(request: Request) {
     const payment: PaymentChoice = ['test', 'razorpay', 'cod'].includes(body.payment) ? body.payment : testPaymentsEnabled() ? 'test' : 'razorpay';
     const coupon = typeof body.coupon === 'string' && body.coupon.trim() ? body.coupon.slice(0, 20) : undefined;
 
-    const placed = await placeOrder({ customer: user, requestId, name, phone, address: { line, city, state, pincode }, delivery: body.delivery, coupon, payment, items });
+    const placed = await placeOrder({ customer: user, requestId, name, phone, address: { line, city, state, pincode }, delivery: body.delivery, coupon, payment, items, gift });
     let { order } = placed;
     if (order.paymentProvider === 'razorpay' && order.status === 'Pending payment') {
       // Online orders get a Razorpay order the browser pays against; a repeat submission reuses it.

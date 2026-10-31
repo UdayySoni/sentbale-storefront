@@ -13,6 +13,7 @@ export function toDemoOrder(order: typeof s.orders.$inferSelect, items: (typeof 
     subtotal: order.subtotal, discount: order.discount, couponCode: order.couponCode, tax: order.tax, taxIncluded: order.taxIncluded,
     status: order.status, paymentStatus: order.paymentStatus, paymentMethod: order.paymentMethod,
     items: snapshot.map(({ id, size, quantity }) => ({ id, size, quantity })), snapshot, address: order.address ?? undefined,
+    ...(order.gift ? { gift: { ...order.gift, charge: order.giftCharge } } : {}),
     ...(order.awb || order.shipStatus ? { tracking: { courier: order.courier ?? undefined, awb: order.awb ?? undefined, status: order.shipStatus ?? undefined, url: order.awb ? trackingUrl(order.awb) : undefined } } : {}),
   };
 }

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { and, asc, eq, inArray, lt, or, sql } from 'drizzle-orm';
 import { db, schema as s, type Db as Database, type Tx } from '@/db';
 import { money, type Size } from './catalog';
-import { config, razorpayEnabled, testPaymentsEnabled } from './config';
+import { config, razorpayEnabled, shiprocketEnabled, testPaymentsEnabled } from './config';
 import { records, setting } from './records-server';
 import { queueMail, type Mail } from './mail-server';
 import { courierRates, parcelWeight, sendToShiprocket } from './shiprocket-server';
@@ -34,6 +34,30 @@ export function cartItems(value: unknown): CartItem[] {
   return items.map(({ id, size, quantity }) => ({ id, size, quantity }));
 }
 
+export const GIFT_CARDS = ['Classic', 'Floral', 'Noir'];
+export type GiftInput = { basket: string; card: string; to: string; from: string; message: string; items: CartItem[] };
+
+/** The gift being built at checkout, or null when there is none. */
+export function giftInput(value: unknown): GiftInput | null {
+  if (value === undefined || value === null) return null;
+  const g = value as Record<string, unknown>;
+  const words = (field: unknown, max: number) => typeof field === 'string' && field.trim().length <= max ? field.trim() : null;
+  const [to, from, message] = [words(g.to, 60), words(g.from, 60), words(g.message ?? '', 300)];
+  if (typeof g.basket !== 'string' || !GIFT_CARDS.includes(String(g.card))) throw new CheckoutError('Check your gift details.');
+  if (!to || !from || message === null) throw new CheckoutError('Add who the gift is to and from.');
+  return { basket: g.basket, card: String(g.card), to, from, message, items: cartItems(g.items) };
+}
+
+/** The whole order: the bag plus the gift's perfumes, with the same size counted on one line. */
+export function orderLines(bag: unknown, gift: GiftInput | null): CartItem[] {
+  const merged = new Map<string, CartItem>();
+  for (const item of [...(Array.isArray(bag) && !bag.length ? [] : cartItems(bag)), ...(gift?.items ?? [])]) {
+    const key = `${item.id}-${item.size}`, seen = merged.get(key);
+    merged.set(key, seen ? { ...seen, quantity: seen.quantity + item.quantity } : item);
+  }
+  return cartItems([...merged.values()]);
+}
+
 // ---- Rules ----------------------------------------------------------------------------------
 
 const regionsOf = (zone: Zone) => String(zone.regions || '').split(/[,;\n]/).map(t => t.trim().toLowerCase()).filter(Boolean);
@@ -61,16 +85,16 @@ export function couponResult(coupons: Coupon[], code: string, subtotal: number, 
 
 // ---- Quote ----------------------------------------------------------------------------------
 
-export type QuoteInput = { items: CartItem[]; delivery: Delivery; state?: string; pincode?: string; coupon?: string };
+export type QuoteInput = { items: CartItem[]; delivery: Delivery; state?: string; pincode?: string; coupon?: string; gift?: GiftInput | null };
 
 /** Everything checkout shows and charges, computed from the database. Never trusts client prices. */
 export async function quote(input: QuoteInput, source?: Source) {
   const database = source ?? await db();
   const ids = [...new Set(input.items.map(i => i.id))];
-  const [productRows, variantRows, coupons, zones, settings, methods] = await Promise.all([
+  const [productRows, variantRows, coupons, zones, settings, methods, baskets] = await Promise.all([
     database.select().from(s.products).where(and(inArray(s.products.id, ids), eq(s.products.published, true))),
     database.select().from(s.productVariants).where(inArray(s.productVariants.productId, ids)),
-    records('coupons', database), records('zones', database), setting('settings', database), records('methods', database),
+    records('coupons', database), records('zones', database), setting('settings', database), records('methods', database), records('baskets', database),
   ]);
   const problems: string[] = [];
   const lines = input.items.flatMap(item => {
@@ -81,33 +105,44 @@ export async function quote(input: QuoteInput, source?: Source) {
     return [{ ...item, variantId: variant.id, tracked: variant.threshold > 0, threshold: variant.threshold, name: product.name, image: product.image, unitPrice: variant.price }];
   });
   const subtotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const basket = input.gift ? baskets.find(b => b.id === input.gift!.basket && b.status === 'Active') : null;
+  if (input.gift && !basket) problems.push('That gift basket is no longer available. Please choose another.');
+  // Coupons apply to the perfumes, not the basket.
+  const giftCharge = Math.max(0, Math.round(Number(basket?.price) || 0));
 
   const applied = input.coupon?.trim() ? couponResult(coupons, input.coupon, subtotal) : null;
   const discount = applied?.discount ?? 0;
   const zone = zones.some(z => z.status === 'Active') ? zoneFor(zones, input.state ?? '') : null;
   // With Shiprocket set up, a pincode gets live courier rates and couriers decide where we deliver;
   // shipping zones then only set free-delivery thresholds. Without it (or if it does not answer), zones price delivery.
-  const live = input.pincode && lines.length ? await courierRates(input.pincode, parcelWeight(lines)) : null;
+  const live = input.pincode && lines.length ? await courierRates(input.pincode, parcelWeight(lines, !!input.gift)) : null;
   const deliverable = live ? live !== 'none' : !input.state?.trim() || !zones.some(z => z.status === 'Active') || !!zone;
-  const rates = live && live !== 'none' ? { standard: live.standard.price, express: live.express.price, eta: live.standard.eta, expressEta: live.express.eta }
+  const couriers = live && live !== 'none' ? live : null;
+  const rates = couriers ? { standard: couriers.standard.price, express: couriers.express?.price ?? 0, eta: couriers.standard.eta, expressEta: couriers.express?.eta ?? '' }
     : zone ? { standard: Number(zone.standard) || 0, express: Number(zone.express) || 0, eta: zone.eta || DEFAULT_DELIVERY.eta, expressEta: DEFAULT_DELIVERY.expressEta }
     : DEFAULT_DELIVERY;
   const freeStandard = applied?.freeShipping || (!!zone && Number(zone.freeAbove) > 0 && subtotal - discount >= Number(zone.freeAbove));
   const options = [
-    { id: 'standard' as const, label: 'Standard delivery', eta: rates.eta, price: freeStandard ? 0 : rates.standard },
-    { id: 'express' as const, label: 'Express delivery', eta: rates.expressEta, price: applied?.freeShipping ? 0 : rates.express },
+    { id: 'standard' as const, label: couriers && !couriers.express ? 'Delivery' : 'Standard delivery', courier: couriers?.standard.courier ?? '', eta: rates.eta, price: freeStandard ? 0 : rates.standard },
+    // With one courier for this pincode there is nothing faster to offer.
+    ...(couriers && !couriers.express ? [] : [{ id: 'express' as const, label: 'Express delivery', courier: couriers?.express?.courier ?? '', eta: rates.expressEta, price: applied?.freeShipping ? 0 : rates.express }]),
   ];
-  const shipping = options.find(o => o.id === input.delivery)?.price ?? 0;
+  const selected = options.find(o => o.id === input.delivery) ?? options[0];
+  const shipping = selected.price;
+  const chosen = couriers ? (selected.id === 'express' ? couriers.express : couriers.standard) : null;
 
   const rate = Math.min(Math.max(Number(settings.gstRate) || 0, 0), 40);
   const taxIncluded = settings.pricesIncludeTax !== false;
-  const taxable = subtotal - discount + shipping;
+  const taxable = subtotal - discount + giftCharge + shipping;
   const tax = taxIncluded ? Math.round(taxable * rate / (100 + rate)) : Math.round(taxable * rate / 100);
   const enabled = methods.filter(m => m.status === 'Enabled');
   return {
-    lines, subtotal, discount, shipping, tax, taxRate: rate, taxIncluded, total: taxable + (taxIncluded ? 0 : tax),
+    lines, subtotal, discount, giftCharge, giftBasket: basket?.name ?? null, shipping, tax, taxRate: rate, taxIncluded, total: taxable + (taxIncluded ? 0 : tax),
     coupon: applied ? { code: input.coupon!.trim().toUpperCase(), applied: !!applied.coupon, message: applied.message, id: applied.coupon?.id } : null,
-    delivery: options, deliverable, zone: zone?.name ?? null, problems,
+    delivery: options, deliveryChosen: selected.id, courierChoice: chosen ? { courierId: chosen.courierId, courier: chosen.courier, price: chosen.price, eta: chosen.eta } : null,
+    /** Live rates need the pincode; until then there is no delivery price to show. */
+    needsPincode: shiprocketEnabled() && !input.pincode,
+    deliverable, zone: zone?.name ?? null, problems,
     payments: {
       razorpay: razorpayEnabled(), test: testPaymentsEnabled(),
       cod: enabled.some(m => /^(cod|cash on delivery)$/i.test(String(m.name).trim()) || /cash on delivery/i.test(String(m.provider))),
@@ -121,7 +156,7 @@ export type Quote = Awaited<ReturnType<typeof quote>>;
 
 export type PlaceOrder = {
   customer: { id: string; email: string }; requestId: string; name: string; phone: string;
-  address: s.OrderAddress; delivery: Delivery; coupon?: string; payment: PaymentChoice; items: CartItem[];
+  address: s.OrderAddress; delivery: Delivery; coupon?: string; payment: PaymentChoice; items: CartItem[]; gift?: GiftInput | null;
 };
 
 async function withItems(order: typeof s.orders.$inferSelect, source: Source) {
@@ -186,11 +221,12 @@ export async function placeOrder(input: PlaceOrder) {
     const online = input.payment === 'razorpay';
     const [order] = await tx.insert(s.orders).values({
       id, customerId: input.customer.id, requestId: input.requestId, name: input.name, email: input.customer.email, phone: input.phone,
-      address: input.address, delivery: input.delivery,
+      address: input.address, delivery: priced.deliveryChosen, shipChoice: priced.courierChoice,
       status: online ? 'Pending payment' : 'Processing', paymentStatus: input.payment === 'test' ? 'Paid' : 'Pending',
       paymentProvider: input.payment, paymentMethod: input.payment === 'cod' ? 'Cash on delivery' : input.payment === 'test' ? 'Test payment' : 'Razorpay',
       subtotal: priced.subtotal, discount: priced.discount, couponCode: priced.coupon?.applied ? priced.coupon.code : null,
-      shipping: priced.shipping, tax: priced.tax, taxIncluded: priced.taxIncluded, total: priced.total,
+      shipping: priced.shipping, tax: priced.tax, taxIncluded: priced.taxIncluded, total: priced.total, giftCharge: priced.giftCharge,
+      gift: input.gift ? { basket: priced.giftBasket ?? '', card: input.gift.card, to: input.gift.to, from: input.gift.from, message: input.gift.message, items: input.gift.items.map(i => `${i.quantity} × ${priced.lines.find(l => l.id === i.id && l.size === i.size)?.name ?? i.id} ${i.size} ml`) } : null,
       expiresAt: online ? new Date(Date.now() + config.holdMinutes * 60000) : null,
     }).returning();
     const items = await tx.insert(s.orderItems).values(priced.lines.map((l, line) => ({ orderId: id, line, productId: l.id, size: l.size, quantity: l.quantity, name: l.name, image: l.image, unitPrice: l.unitPrice }))).returning();
@@ -243,6 +279,9 @@ export async function markPaid(orderId: string, paymentId: string) {
 
 // ---- Notifications --------------------------------------------------------------------------
 
+/** What to pack for a gift, in one line. */
+export const giftSummary = (g: s.OrderGift) => `${g.basket}: ${g.items.join(', ')}. ${g.card} card, to ${g.to}, from ${g.from}${g.message ? `: “${g.message}”` : ''}`;
+
 async function announceOrder(orderId: string) {
   try {
     const database = await db();
@@ -254,14 +293,14 @@ async function announceOrder(orderId: string) {
       database.select({ id: s.productVariants.id, sku: s.productVariants.sku, stock: s.productVariants.stock, threshold: s.productVariants.threshold }).from(s.productVariants).where(and(sql`${s.productVariants.threshold} > 0`, sql`${s.productVariants.stock} <= ${s.productVariants.threshold}`)),
     ]);
     const lines = items.map(i => `${i.quantity} × ${i.name} ${i.size} ml — ${money(i.unitPrice * i.quantity)}`).join('\n');
-    const totals = [`Subtotal: ${money(order.subtotal)}`, order.discount ? `Discount (${order.couponCode}): −${money(order.discount)}` : '', `Delivery: ${order.shipping ? money(order.shipping) : 'Complimentary'}`, `GST${order.taxIncluded ? ' included' : ''}: ${money(order.tax)}`, `Total: ${money(order.total)}`].filter(Boolean).join('\n');
+    const totals = [`Subtotal: ${money(order.subtotal)}`, order.discount ? `Discount (${order.couponCode}): −${money(order.discount)}` : '', order.gift ? `${order.gift.basket}: ${money(order.giftCharge)}` : '', `Delivery: ${order.shipping ? money(order.shipping) : 'Complimentary'}`, `GST${order.taxIncluded ? ' included' : ''}: ${money(order.tax)}`, `Total: ${money(order.total)}`].filter(Boolean).join('\n');
     const address = order.address ? `${order.address.line}, ${order.address.city}, ${order.address.state} ${order.address.pincode}` : '';
     const store = settings.storeName || 'SENTBALE';
     const mails: Mail[] = [{
       to: order.email, subject: `${store} order confirmed`,
       body: `Hello ${order.name.split(' ')[0]},\n\nThank you for your order ${order.id}.\n\n${lines}\n\n${totals}\n\nPayment: ${order.paymentMethod}${order.paymentStatus === 'Paid' ? ' (paid)' : ' (due on delivery)'}\nDelivering to: ${address}\n\nYou can follow your order at ${config.siteUrl}/account/orders/${order.id}\n\n${store}`,
     }];
-    if (settings.email && settings.notifyOrders) mails.push({ to: settings.email, subject: `New order #${order.number} — ${money(order.total)}`, body: `${order.name} <${order.email}>${order.phone ? `, ${order.phone}` : ''}\n\n${lines}\n\n${totals}\n\nPayment: ${order.paymentMethod}, ${order.paymentStatus}\nDeliver to: ${address}\n\n${config.siteUrl}/admin/orders` });
+    if (settings.email && settings.notifyOrders) mails.push({ to: settings.email, subject: `New order #${order.number} — ${money(order.total)}`, body: `${order.name} <${order.email}>${order.phone ? `, ${order.phone}` : ''}\n\n${lines}\n\n${totals}\n\n${order.gift ? `GIFT — ${giftSummary(order.gift)}\n\n` : ''}Payment: ${order.paymentMethod}, ${order.paymentStatus}\nDeliver to: ${address}\n\n${config.siteUrl}/admin/orders` });
     // Only sizes this order touched, so each alert is news.
     const ordered = new Set(items.map(i => `${i.productId}-${i.size}`));
     const low = lowStock.filter(v => ordered.has(v.id));

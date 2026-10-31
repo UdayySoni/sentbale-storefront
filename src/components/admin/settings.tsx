@@ -40,6 +40,7 @@ const announcementFields: Fld[] = [
 const sectionFields: Fld[] = [
   { name: 'featured', label: 'Featured fragrances', maxLength: 200, hint: 'Product names separated by commas, in display order.' },
   { name: 'showFinder', label: 'Show the scent finder', type: 'toggle', half: true }, { name: 'showJournal', label: 'Show journal stories', type: 'toggle', half: true },
+  { name: 'showGifts', label: 'Show the gift builder', type: 'toggle', half: true },
 ];
 export function HomepageContent() {
   const db = useDb();

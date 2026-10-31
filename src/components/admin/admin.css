@@ -328,3 +328,38 @@
 /* Read-only field holding a link to copy, e.g. a team invitation. */
 .adm-copy-field { display: block; width: 100%; margin: 12px 0; padding: 9px 11px; border: 1px solid #e0d2bd; border-radius: 7px; background: #fffdf9; color: var(--a-ink); font: 13px/1.4 ui-monospace, monospace; }
 .adm-copy-field:focus { border-color: var(--a-gold); outline: 0; box-shadow: 0 0 0 3px #b98a4e30; }
+.adm-cell-main small.adm-gift { display: block; max-width: 320px; white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+
+.adm-gallery { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; padding: 12px; border-radius: 8px; background: var(--a-soft); }
+.adm-gallery-item { position: relative; }
+.adm-gallery-item .adm-thumb { width: 76px; height: 76px; }
+.adm-gallery-item.main .adm-thumb { outline: 2px solid var(--a-gold-deep); outline-offset: 1px; }
+.adm-gallery-item button { position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: #fffaf3e6; color: var(--a-ink); }
+.adm-gallery-item button.remove { left: auto; right: 3px; }
+.adm-gallery-tag { position: absolute; left: 3px; bottom: 3px; padding: 1px 6px; border-radius: 4px; background: var(--a-gold-deep); color: #fff; font-size: 11px; }
+.adm-image-field { display: flex; align-items: center; gap: 12px; margin-top: 6px; font-weight: 400; }
+.adm-image-field img { width: 76px; height: 76px; object-fit: cover; border-radius: 7px; }
+.adm-ship-account { display: flex; flex-wrap: wrap; gap: 8px 26px; align-items: center; margin-bottom: 12px; padding: 14px 18px; font-size: 13.5px; }
+.adm-ship-account b { font-weight: 600; }
+.adm-ship-dot { display: inline-block; width: 9px; height: 9px; margin-right: 7px; border-radius: 50%; background: var(--a-bad); }
+.adm-ship-dot.on { background: var(--a-good); }
+.adm-ship-account .adm-btn { margin-left: auto; }
+.adm-ship-stats { grid-template-columns: repeat(5, minmax(0, 1fr)); margin-bottom: 12px; }
+.adm-ship-stats button { display: block; padding: 14px 16px; text-align: left; cursor: pointer; }
+.adm-ship-stats button.active { border-color: var(--a-gold-deep); box-shadow: inset 0 0 0 1px var(--a-gold-deep); }
+.adm-ship-stats strong { display: block; font-size: 24px; font-weight: 700; line-height: 1.3; }
+.adm-ship-stats span { font-size: 13px; color: var(--a-muted); }
+.adm-ship-table td { vertical-align: top; }
+.adm-ship-table a { color: var(--a-gold-deep); text-decoration: underline; }
+.adm-ship-table .adm-cell-main { min-width: 170px; max-width: 250px; }
+.adm-ship-table .adm-cell-main small { display: block; overflow: visible; overflow-wrap: anywhere; }
+.adm-ship-table .adm-row-actions { flex-wrap: wrap; justify-content: flex-end; }
+.adm-ship-error { color: var(--a-bad); font-size: 12.5px; }
+.adm-ship-detail { display: grid; gap: 18px; font-size: 14px; }
+.adm-ship-detail h3 { margin-bottom: 6px; font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; color: var(--a-muted); }
+.adm-ship-detail a { color: var(--a-gold-deep); text-decoration: underline; }
+.adm-ship-detail ul { margin: 0; padding: 0; list-style: none; }
+@media (max-width: 1000px) { .adm-ship-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.adm-gallery-item { flex: 0 0 76px; width: 76px; height: 76px; }
+.adm-gallery-item .adm-thumb { display: block; position: relative; overflow: hidden; }
+.adm-ship-table .adm-chip, .adm-ship-detail .adm-chip { display: inline-flex; align-items: center; gap: 5px; }

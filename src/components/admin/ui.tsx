@@ -87,7 +87,7 @@ export function Tabs({ base, current, tabs }: { base: string; current: string; t
 export function Loading() { return <div className="adm-loading" aria-busy="true">Opening your workspace…</div>; }
 
 /* ---------- Form fields ---------- */
-export type Fld = { name: string; label: string; type?: 'text' | 'email' | 'number' | 'textarea' | 'select' | 'date' | 'toggle' | 'url'; options?: string[] | ((db: Db) => string[]); required?: boolean; min?: number; max?: number; step?: number; maxLength?: number; half?: boolean; hint?: string };
+export type Fld = { name: string; label: string; type?: 'text' | 'email' | 'number' | 'textarea' | 'select' | 'date' | 'toggle' | 'url' | 'image'; options?: string[] | ((db: Db) => string[]); required?: boolean; min?: number; max?: number; step?: number; maxLength?: number; half?: boolean; hint?: string };
 export type FormValues = Record<string, string | boolean>;
 
 export function toForm(fields: Fld[], row: Record<string, unknown>): FormValues {
@@ -125,6 +125,7 @@ export function Fields({ fields, values, onChange, db }: { fields: Fld[]; values
   return <div className="adm-fields">{fields.map(field => {
     const value = values[field.name];
     if (field.type === 'toggle') return <label key={field.name} className={`adm-toggle ${field.half ? 'half' : ''}`}><input type="checkbox" checked={!!value} onChange={event => onChange(field.name, event.target.checked)} /><span aria-hidden="true" /><b>{field.label}{field.hint && <small>{field.hint}</small>}</b></label>;
+    if (field.type === 'image') return <ImageField key={field.name} label={field.label} hint={field.hint} value={String(value ?? '')} change={next => onChange(field.name, next)} />;
     const common = { value: String(value ?? ''), required: field.required, onChange: (event: { target: { value: string } }) => onChange(field.name, event.target.value) };
     const options = typeof field.options === 'function' ? field.options(db) : field.options;
     return <label key={field.name} className={`adm-field ${field.half ? 'half' : ''}`}>{field.label}
@@ -134,6 +135,30 @@ export function Fields({ fields, values, onChange, db }: { fields: Fld[]; values
       {field.hint && <small>{field.hint}</small>}
     </label>;
   })}</div>;
+}
+
+/** One uploaded photo, for forms that need a picture. */
+function ImageField({ label, hint, value, change }: { label: string; hint?: string; value: string; change: (src: string) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  async function upload(file: File | undefined) {
+    if (!file) return;
+    setBusy(true); setError('');
+    try {
+      const body = new FormData(); body.append('file', file);
+      const response = await fetch('/api/media/upload', { method: 'POST', body });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      change(data.src);
+    } catch (e) { setError(e instanceof Error && e.message ? e.message : 'The image could not be uploaded.'); }
+    finally { setBusy(false); }
+  }
+  return <div className="adm-field">{label}
+    <div className="adm-image-field">{/* eslint-disable-next-line @next/next/no-img-element */}{value && <img src={value} alt="" />}
+      <label className="adm-upload">{busy ? 'Uploading…' : value ? 'Change image' : 'Upload image'}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={event => { void upload(event.target.files?.[0]); event.target.value = ''; }} /></label>
+      {value && <button type="button" className="adm-chip" onClick={() => change('')}>Remove</button>}</div>
+    {error && <small role="alert">{error}</small>}{hint && <small>{hint}</small>}
+  </div>;
 }
 
 /* ---------- CSV export ---------- */

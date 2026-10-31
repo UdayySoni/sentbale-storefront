@@ -43,19 +43,22 @@ export default function MediaAdmin() {
     } catch (e) { setError(e instanceof Error ? e.message : 'Could not save changes.'); }
     finally { setBusy(false); }
   }
-  async function upload(file: File | undefined) {
-    if (!file) return;
+  /** The first photo goes on the selected slot; any others wait in the library below. */
+  async function upload(files: FileList | null) {
+    if (!files?.length) return;
     const target = selected;
     setBusy(true); setError(''); setNotice('');
     try {
-      if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 8 * 1024 * 1024) throw new Error('Choose a PNG, JPEG or WebP image smaller than 8 MB.');
-      const decoded = await createImageBitmap(file); decoded.close();
-      const body = new FormData(); body.set('file', file);
-      const response = await fetch('/api/media/upload', { method: 'POST', body });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error);
-      setUploads(current => [...current, data]);
-      setDraft(current => ({ ...current, [target]: { ...current[target], src: data.src } }));
-      setNotice('Image uploaded. Adjust its crop, then save your changes.');
+      for (const [i, file] of [...files].entries()) {
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 8 * 1024 * 1024) throw new Error(`${file.name}: choose a PNG, JPEG or WebP image smaller than 8 MB.`);
+        const decoded = await createImageBitmap(file); decoded.close();
+        const body = new FormData(); body.set('file', file);
+        const response = await fetch('/api/media/upload', { method: 'POST', body });
+        const data = await response.json(); if (!response.ok) throw new Error(data.error);
+        setUploads(current => [...current, data]);
+        if (i === 0) setDraft(current => ({ ...current, [target]: { ...current[target], src: data.src } }));
+      }
+      setNotice(files.length > 1 ? `${files.length} images uploaded. The first is on this slot and the rest are in your library. Save your changes.` : 'Image uploaded. Adjust its crop, then save your changes.');
     } catch (e) { setError(e instanceof Error ? e.message : 'That image could not be opened.'); }
     finally { setBusy(false); if (input.current) input.current.value = ''; }
   }
@@ -78,7 +81,7 @@ export default function MediaAdmin() {
         <div className="admin-workspace"><div className="admin-slot-list">{mediaSlots.filter(s => group === 'All images' || s.group === group).map(s => <button className={selected === s.id ? 'selected' : ''} onClick={() => setSelected(s.id)} key={s.id} aria-pressed={selected === s.id}><img src={draft[s.id].src} alt="" /><span><small>{s.group}</small><strong>{s.label}</strong></span>{changed[s.id] && <i title="Unsaved change" />}<ArrowUpRight size={16} /></button>)}</div>
           <section className="admin-editor" aria-label="Image editor"><div className="admin-editor-heading"><div><p className="eyebrow">{slot.group}</p><h2>{slot.label}</h2></div><button className="text-link" onClick={() => edit(defaultMedia.images[selected])} disabled={busy}><RotateCcw size={13} /> Reset image</button></div><p className="admin-hint">{slot.hint}</p>
             <div className={`admin-image-preview ${selected === 'hero.mobile' ? 'portrait' : ''}`}><img src={value.src} alt={value.alt || 'Decorative image preview'} style={{ objectPosition: value.position }} />{selected.startsWith('hero.') && <div className="admin-preview-copy">More than<br />a fragrance.<em>A feeling.</em></div>}</div>
-            <fieldset disabled={busy} className="admin-fields"><div className="admin-upload-row"><label className="button"><ImagePlus size={17} /> Replace image<input ref={input} type="file" accept="image/png,image/jpeg,image/webp" aria-label="Upload image" onChange={e => upload(e.target.files?.[0])} /></label><span>PNG, JPEG or WebP<br />Up to 8 MB</span></div><label className="field">Image description<input aria-label="Image description" value={value.alt} maxLength={250} onChange={e => edit({ alt: e.target.value })} /><small>Describe what the image shows. Leave blank only for decoration.</small></label><div className="admin-crop"><label>Horizontal crop <span className="crop-value" aria-hidden="true">{value.position.split(' ')[0]}</span><input aria-label="Horizontal crop" type="range" min="0" max="100" value={parseInt(value.position)} onChange={e => edit({ position: `${e.target.value}% ${value.position.split(' ')[1]}` })} /></label><label>Vertical crop <span className="crop-value" aria-hidden="true">{value.position.split(' ')[1]}</span><input aria-label="Vertical crop" type="range" min="0" max="100" value={parseInt(value.position.split(' ')[1])} onChange={e => edit({ position: `${value.position.split(' ')[0]} ${e.target.value}%` })} /></label></div>
+            <fieldset disabled={busy} className="admin-fields"><div className="admin-upload-row"><label className="button"><ImagePlus size={17} /> Replace image<input ref={input} type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label="Upload images" onChange={e => upload(e.target.files)} /></label><span>PNG, JPEG or WebP<br />Up to 8 MB</span></div><label className="field">Image description<input aria-label="Image description" value={value.alt} maxLength={250} onChange={e => edit({ alt: e.target.value })} /><small>Describe what the image shows. Leave blank only for decoration.</small></label><div className="admin-crop"><label>Horizontal crop <span className="crop-value" aria-hidden="true">{value.position.split(' ')[0]}</span><input aria-label="Horizontal crop" type="range" min="0" max="100" value={parseInt(value.position)} onChange={e => edit({ position: `${e.target.value}% ${value.position.split(' ')[1]}` })} /></label><label>Vertical crop <span className="crop-value" aria-hidden="true">{value.position.split(' ')[1]}</span><input aria-label="Vertical crop" type="range" min="0" max="100" value={parseInt(value.position.split(' ')[1])} onChange={e => edit({ position: `${value.position.split(' ')[0]} ${e.target.value}%` })} /></label></div>
             <div className="admin-library"><p className="eyebrow">OR CHOOSE FROM YOUR LIBRARY</p><div>{[...builtInImages, ...uploads.map(u => u.src)].map((src, i) => <button key={src} onClick={() => edit({ src })} aria-label={`Use library image ${i + 1}`} aria-pressed={value.src === src} className={value.src === src ? 'selected' : ''}><img src={src} alt={`Library image ${i + 1}`} loading="lazy" />{value.src === src && <CheckCircle2 size={18} />}</button>)}</div></div></fieldset>
           </section></div>
         <div className="admin-save-bar"><p>{dirty ? `${dirty} image placement${dirty === 1 ? '' : 's'} with unsaved changes` : 'All changes saved'}<small>Updates appear across the local site after saving.</small></p><button className="text-link" disabled={!dirty || busy} onClick={() => { setDraft(saved.images); setNotice('Draft changes discarded.'); }}>Discard changes</button><button className="button" onClick={save} disabled={!dirty || busy}><Save size={16} /> Save changes</button></div>

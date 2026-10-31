@@ -9,8 +9,8 @@ type Who = { role: string };
 /** The permission section that governs each workspace list or setting. */
 const SECTION: Record<string, string[]> = {
   products: ['products'], skus: ['inventory', 'products'], collections: ['collections'],
-  orders: ['orders', 'payments'], customers: ['customers'], enquiries: ['customers'],
-  coupons: ['coupons'], reviews: ['reviews'], posts: ['journal'], zones: ['shipping'], partners: ['shipping'],
+  orders: ['orders', 'payments', 'shipments'], shipments: ['shipments', 'orders'], customers: ['customers'], enquiries: ['customers'],
+  baskets: ['gifts'], coupons: ['coupons'], reviews: ['reviews'], posts: ['journal'], zones: ['shipping'], partners: ['shipping'],
   methods: ['payments'], roles: ['roles'], team: ['roles'], audit: ['audit'],
   homepage: ['homepage'], settings: ['settings'], seen: ['dashboard'], media: ['products', 'homepage'],
 };

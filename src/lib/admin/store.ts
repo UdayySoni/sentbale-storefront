@@ -14,7 +14,7 @@ import type { Db, ListKey, Row } from './types';
  */
 const LEGACY_KEY = 'sentbale.admin.v1';
 const CHANNEL = 'sentbale-admin';
-const LISTS: ListKey[] = ['products', 'skus', 'orders', 'customers', 'collections', 'coupons', 'reviews', 'posts', 'zones', 'partners', 'methods', 'roles', 'team', 'enquiries'];
+const LISTS: ListKey[] = ['baskets', 'products', 'skus', 'orders', 'customers', 'collections', 'coupons', 'reviews', 'posts', 'zones', 'partners', 'methods', 'roles', 'team', 'enquiries'];
 const OBJECTS = ['homepage', 'settings', 'seen'] as const;
 type Changes = { lists: Record<string, { upsert: Row[]; remove: string[] }>; objects: Partial<Pick<Db, typeof OBJECTS[number]>>; audit?: { action: string; target: string } };
 

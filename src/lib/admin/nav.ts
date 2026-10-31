@@ -15,6 +15,7 @@ export const nav: NavItem[] = [
     { label: 'Shipped', href: '/admin/orders?status=Shipped' },
     { label: 'Cancelled', href: '/admin/orders?status=Cancelled' },
   ] },
+  { key: 'shipments', label: 'Shiprocket', href: '/admin/shipments' },
   { key: 'customers', label: 'Customers', href: '/admin/customers', children: [
     { label: 'All customers', href: '/admin/customers' },
     { label: 'VIP', href: '/admin/customers?tag=VIP' },
@@ -26,6 +27,7 @@ export const nav: NavItem[] = [
     { label: 'Low stock', href: '/admin/inventory?level=Low+stock' },
     { label: 'Out of stock', href: '/admin/inventory?level=Out+of+stock' },
   ] },
+  { key: 'gifts', label: 'Gift Baskets', href: '/admin/gifts' },
   { key: 'coupons', label: 'Coupons', href: '/admin/coupons' },
   { key: 'reviews', label: 'Reviews', href: '/admin/reviews' },
   { key: 'journal', label: 'Journal', href: '/admin/journal', children: [

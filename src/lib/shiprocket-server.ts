@@ -14,8 +14,11 @@ const TOKEN_KEY = 'shiprocket_token';
 /** Packed weight (kg) of one bottle by its size in ml (glass and box plus the liquid: 50 ml ≈ 0.33 kg), and the box it ships in (cm). */
 const bottleKg = (ml: number) => 0.2 + ml * 0.0025;
 const BOX = { length: 15, breadth: 10, height: 8 };
-export const parcelWeight = (lines: { size: number; quantity: number }[]) =>
-  Math.max(0.1, Math.round(lines.reduce((kg, l) => kg + bottleKg(l.size) * l.quantity, 0) * 100) / 100);
+/** A gift basket adds its own weight and needs a bigger box. */
+const BASKET_KG = 0.5;
+const BASKET_BOX = { length: 30, breadth: 25, height: 15 };
+export const parcelWeight = (lines: { size: number; quantity: number }[], basket = false) =>
+  Math.max(0.1, Math.round(lines.reduce((kg, l) => kg + bottleKg(l.size) * l.quantity, basket ? BASKET_KG : 0) * 100) / 100);
 const parcelBox = (units: number) => ({ ...BOX, height: BOX.height * Math.min(Math.max(units, 1), 4) });
 
 export class ShiprocketError extends Error {}
@@ -79,14 +82,15 @@ export async function pickup(): Promise<Pickup> {
 
 // ---- Rates ----------------------------------------------------------------------------------
 
-export type CourierRate = { price: number; days: number | null; eta: string };
-type Serviceable = { data?: { available_courier_companies?: { rate: number | string; estimated_delivery_days?: string | number; etd?: string }[] } };
+export type CourierRate = { courierId: number | null; courier: string; air: boolean; price: number; days: number | null; eta: string };
+type Serviceable = { data?: { available_courier_companies?: { courier_company_id?: number; courier_name?: string; is_surface?: boolean; rate: number | string; estimated_delivery_days?: string | number; etd?: string }[] } };
 
 /**
- * Courier options to a pincode: the cheapest (standard) and the fastest (express). Null when Shiprocket is
- * not set up or does not answer, so checkout falls back to the shipping zones; `none` when nobody delivers there.
+ * The couriers on the Shiprocket account for a pincode: the cheapest is standard, and express is a dearer one at
+ * least as fast. Express is null when no such courier exists, so two options never show one price. Null when
+ * Shiprocket is not set up or does not answer, so checkout falls back to the shipping zones; `none` when nobody delivers there.
  */
-export async function courierRates(pincode: string, weightKg: number): Promise<{ standard: CourierRate; express: CourierRate } | 'none' | null> {
+export async function courierRates(pincode: string, weightKg: number): Promise<{ standard: CourierRate; express: CourierRate | null } | 'none' | null> {
   if (!shiprocketEnabled() || !/^[1-9][0-9]{5}$/.test(pincode)) return null;
   try {
     const from = await pickup();
@@ -94,11 +98,14 @@ export async function courierRates(pincode: string, weightKg: number): Promise<{
     const { status, data } = await call<Serviceable>(`/courier/serviceability/?${query}`, {}, 6000);
     const options = (data.data?.available_courier_companies ?? []).map(c => {
       const days = Number(c.estimated_delivery_days) || null;
-      return { price: Math.ceil(Number(c.rate) || 0), days, eta: days ? `${days}–${days + 1} business days` : c.etd ? `By ${c.etd}` : '3–7 business days' };
+      return { courierId: c.courier_company_id ?? null, courier: c.courier_name ?? '', air: c.is_surface === false, price: Math.ceil(Number(c.rate) || 0), days, eta: days ? `${days}–${days + 1} business days` : c.etd ? `By ${c.etd}` : '3–7 business days' };
     }).filter(c => c.price > 0);
     if (!options.length) return status === 200 || status === 404 ? 'none' : null;
-    const standard = options.reduce((a, b) => b.price < a.price ? b : a);
-    const express = options.reduce((a, b) => (b.days ?? 99) < (a.days ?? 99) || ((b.days ?? 99) === (a.days ?? 99) && b.price < a.price) ? b : a);
+    const speed = (c: CourierRate) => c.days ?? 99;
+    const standard = options.reduce((a, b) => b.price < a.price || (b.price === a.price && speed(b) < speed(a)) ? b : a);
+    const upgrades = options.filter(c => c.price > standard.price && speed(c) <= speed(standard));
+    // Fastest first, then air over road, then the lower price.
+    const express = upgrades.reduce<CourierRate | null>((a, b) => !a || speed(b) < speed(a) || (speed(b) === speed(a) && (b.air > a.air || (b.air === a.air && b.price < a.price))) ? b : a, null);
     return { standard, express };
   } catch (error) {
     console.error('[shiprocket] rates', error);
@@ -135,10 +142,11 @@ export async function sendToShiprocket(orderId: string) {
         billing_address: order.address.line, billing_city: order.address.city, billing_pincode: order.address.pincode,
         billing_state: order.address.state, billing_country: 'India', billing_email: order.email, billing_phone: phone,
         shipping_is_billing: true,
-        order_items: items.map(i => ({ name: `${i.name} ${i.size} ml`, sku: `${i.productId}-${i.size}`, units: i.quantity, selling_price: i.unitPrice })),
+        // The basket is a line of its own, so the lines add up to what the courier collects on cash orders.
+        order_items: [...items.map(i => ({ name: `${i.name} ${i.size} ml`, sku: `${i.productId}-${i.size}`, units: i.quantity, selling_price: i.unitPrice })), ...(order.gift && order.giftCharge > 0 ? [{ name: order.gift.basket, sku: 'gift-basket', units: 1, selling_price: order.giftCharge }] : [])],
         payment_method: cod ? 'COD' : 'Prepaid',
         shipping_charges: order.shipping, total_discount: order.discount, sub_total: order.total - order.shipping + order.discount,
-        weight: parcelWeight(items), ...parcelBox(units),
+        weight: parcelWeight(items, !!order.gift), ...(order.gift ? BASKET_BOX : parcelBox(units)),
       }),
     });
     if (status >= 300 || !data.order_id) {
@@ -154,6 +162,49 @@ export async function sendToShiprocket(orderId: string) {
     const message = error instanceof ShiprocketError ? error.message : 'Shiprocket could not be reached.';
     await database.update(s.orders).set({ shipError: message.slice(0, 300) }).where(eq(s.orders.id, orderId)).catch(() => {});
   }
+}
+
+// ---- Admin → Shiprocket ---------------------------------------------------------------------
+
+/** The account behind the integration, for the top of the admin page. */
+export async function shiprocketAccount() {
+  const base = { enabled: shiprocketEnabled(), webhook: !!config.shiprocket.webhookToken };
+  if (!base.enabled) return { ...base, connected: false };
+  try {
+    const [from, wallet] = await Promise.all([pickup(), call<{ data?: { balance_amount?: string | number } }>('/account/details/wallet-balance')]);
+    return { ...base, connected: true, pickup: from, wallet: Number(wallet.data.data?.balance_amount ?? 0) };
+  } catch (error) {
+    console.error('[shiprocket] account', error);
+    return { ...base, connected: false, error: error instanceof ShiprocketError ? error.message : 'Shiprocket could not be reached.' };
+  }
+}
+
+/**
+ * Books the shopper's courier (or Shiprocket's pick, by your dashboard's courier rules, if none is saved) and asks
+ * for a pickup. This is what charges the Shiprocket wallet, so it only ever runs from an admin's button.
+ */
+export async function bookCourier(orderId: string) {
+  const database = await db();
+  const [order] = await database.select().from(s.orders).where(eq(s.orders.id, orderId));
+  if (!order?.shipmentId) throw new ShiprocketError('Send this order to Shiprocket first.');
+  if (order.awb) throw new ShiprocketError('This order already has a courier.');
+  type Assigned = { awb_assign_status?: number; message?: string; response?: { data?: { awb_code?: string; courier_name?: string; awb_assign_error?: string } } };
+  const { data } = await call<Assigned>('/courier/assign/awb', { method: 'POST', body: JSON.stringify({ shipment_id: Number(order.shipmentId), ...(order.shipChoice?.courierId ? { courier_id: order.shipChoice.courierId } : {}) }) }, 20000);
+  const assigned = data.response?.data;
+  if (data.awb_assign_status !== 1 || !assigned?.awb_code) throw new ShiprocketError(assigned?.awb_assign_error || data.message || 'Shiprocket could not assign a courier.');
+  const picked = await call('/courier/generate/pickup', { method: 'POST', body: JSON.stringify({ shipment_id: [Number(order.shipmentId)] }) }, 20000).catch(() => null);
+  const scheduled = !!picked && picked.status < 300;
+  await applyTracking(orderId, { awb: assigned.awb_code, courier: assigned.courier_name, shipStatus: scheduled ? 'PICKUP SCHEDULED' : 'AWB ASSIGNED' });
+  return { awb: assigned.awb_code, courier: assigned.courier_name ?? '', scheduled };
+}
+
+/** A link to the printable shipping label of a booked order. */
+export async function shippingLabel(orderId: string) {
+  const [order] = await (await db()).select().from(s.orders).where(eq(s.orders.id, orderId));
+  if (!order?.shipmentId || !order.awb) throw new ShiprocketError('Book a courier before printing the label.');
+  const { data } = await call<{ label_url?: string; message?: string; response?: string }>('/courier/generate/label', { method: 'POST', body: JSON.stringify({ shipment_id: [Number(order.shipmentId)] }) }, 20000);
+  if (!data.label_url) throw new ShiprocketError(data.response || data.message || 'Shiprocket could not create the label.');
+  return data.label_url;
 }
 
 // ---- Tracking -------------------------------------------------------------------------------

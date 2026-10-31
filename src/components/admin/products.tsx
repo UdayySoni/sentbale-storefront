@@ -2,8 +2,8 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
-import { ImageIcon, ImagePlus, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
-import { families, money } from '@/lib/catalog';
+import { ImageIcon, ImagePlus, Pencil, Plus, Search, Star, Trash2, X } from 'lucide-react';
+import { money, products as builtIn } from '@/lib/catalog';
 import { skuCode, slug } from '@/lib/admin/seed';
 import { patchDb, useDb } from '@/lib/admin/store';
 import type { AdminProduct, Collection, Sku } from '@/lib/admin/types';
@@ -11,18 +11,19 @@ import { Thumb } from './dashboard';
 import { Badge, Confirm, Drawer, Loading, PageHeader, useToast } from './ui';
 
 type SizeRow = { key: string; size: string; price: string; stock: string; threshold: string };
-type Form = { name: string; family: string; mood: string; description: string; badge: string; image: string; color: string; top: string; heart: string; base: string; status: 'Active' | 'Draft'; sizes: SizeRow[] };
+type Form = { name: string; family: string; mood: string; description: string; badge: string; images: string[]; color: string; top: string; heart: string; base: string; status: 'Active' | 'Draft'; sizes: SizeRow[] };
 
 const key = () => Math.random().toString(36).slice(2);
 const sizeRow = (size = '', price = '', stock = '0', threshold = '0'): SizeRow => ({ key: key(), size, price, stock, threshold });
-const blank = (): Form => ({ name: '', family: '', mood: '', description: '', badge: '', image: '', color: '#7a6a55', top: '', heart: '', base: '', status: 'Draft', sizes: [sizeRow('50', '')] });
+const blank = (): Form => ({ name: '', family: '', mood: '', description: '', badge: '', images: [], color: '#7a6a55', top: '', heart: '', base: '', status: 'Draft', sizes: [sizeRow('50', '')] });
 const list = (text: string) => text.split(',').map(t => t.trim()).filter(Boolean).slice(0, 10);
-const familyImage = (family: string) => families.find(f => f.name.toLowerCase() === family.toLowerCase())?.image || '/images/legacy.png';
+const MAX_PHOTOS = 13;
+const familyImage = (family: string) => builtIn.find(p => p.family.toLowerCase() === family.toLowerCase())?.image || '/images/legacy.png';
 
 function formOf(p: AdminProduct, skus: Sku[]): Form {
   const own = skus.filter(s => s.productId === p.id).sort((a, b) => a.size - b.size);
   return {
-    name: p.name, family: p.family, mood: p.mood, description: p.description, badge: p.badge || '', image: p.image, color: p.color || '#7a6a55',
+    name: p.name, family: p.family, mood: p.mood, description: p.description, badge: p.badge || '', images: [p.image, ...(p.images ?? [])], color: p.color || '#7a6a55',
     top: p.notes?.[0]?.join(', ') || '', heart: p.notes?.[1]?.join(', ') || '', base: p.notes?.[2]?.join(', ') || '',
     status: p.status, sizes: own.length ? own.map(s => sizeRow(String(s.size), String(s.price), String(s.stock), String(s.threshold))) : [sizeRow('50', String(p.price))],
   };
@@ -39,7 +40,7 @@ export default function Products() {
   const [editing, setEditing] = useState<AdminProduct | 'new' | null>(null);
   const [form, setForm] = useState<Form>(blank);
   const [error, setError] = useState('');
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState('');
   const [doomed, setDoomed] = useState<AdminProduct | null>(null);
 
   const q = params.get('q'), wantsNew = params.get('new');
@@ -55,17 +56,21 @@ export default function Products() {
   const change = (patch: Partial<Form>) => { setForm(current => ({ ...current, ...patch })); setError(''); };
   const changeSize = (rowKey: string, patch: Partial<SizeRow>) => change({ sizes: form.sizes.map(r => r.key === rowKey ? { ...r, ...patch } : r) });
 
-  async function upload(file: File | undefined) {
-    if (!file) return;
-    setUploading(true); setError('');
+  async function upload(list: FileList | null) {
+    const files = [...(list ?? [])].slice(0, MAX_PHOTOS - form.images.length);
+    if (!files.length) return setError(list?.length ? `A product can have up to ${MAX_PHOTOS} photos.` : '');
+    setError('');
     try {
-      const body = new FormData(); body.append('file', file);
-      const response = await fetch('/api/media/upload', { method: 'POST', body });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
-      change({ image: data.src });
+      for (const [i, file] of files.entries()) {
+        setUploading(`Uploading ${i + 1} of ${files.length}…`);
+        const body = new FormData(); body.append('file', file);
+        const response = await fetch('/api/media/upload', { method: 'POST', body });
+        const data = await response.json();
+        if (!response.ok) throw new Error(`${file.name}: ${data.error}`);
+        setForm(current => ({ ...current, images: [...current.images, data.src] }));
+      }
     } catch (e) { setError(e instanceof Error && e.message ? e.message : 'The image could not be uploaded.'); }
-    finally { setUploading(false); }
+    finally { setUploading(''); }
   }
 
   function save() {
@@ -86,7 +91,7 @@ export default function Products() {
     let id = editing === 'new' ? slug(name) || 'product' : editing.id;
     if (editing === 'new') while (db.products.some(p => p.id === id)) id += '-2';
     const product: AdminProduct = {
-      id, name, family: familyName, mood, description, badge: badge || undefined, image: form.image || familyImage(familyName), color: form.color,
+      id, name, family: familyName, mood, description, badge: badge || undefined, image: form.images[0] || familyImage(familyName), images: form.images.slice(1), color: form.color,
       notes: [list(form.top), list(form.heart), list(form.base)], price: Math.min(...rows.map(r => r.price)), status: form.status,
     };
     const old = skusOf.get(id) || [];
@@ -111,7 +116,6 @@ export default function Products() {
     setDoomed(null);
   }
   const target = editing && editing !== 'new' ? editing : null;
-  const preview = form.image || familyImage(form.family);
 
   return <>
     <PageHeader title="Products" description="Everything about each fragrance: sizes, prices, stock, image and story.">
@@ -141,7 +145,11 @@ export default function Products() {
 
     <Drawer open={!!editing} eyebrow={editing === 'new' ? 'NEW PRODUCT' : 'EDIT PRODUCT'} title={editing === 'new' ? 'Add product' : target?.name || ''} onClose={() => setEditing(null)}>
       <form onSubmit={event => { event.preventDefault(); save(); }} noValidate>
-        <div className="adm-drawer-image"><Thumb src={preview} /><label className="adm-upload">{uploading ? 'Uploading…' : <><ImagePlus size={15} /> {form.image ? 'Change image' : 'Upload image'}</>}<input type="file" accept="image/png,image/jpeg,image/webp" disabled={uploading} onChange={event => { void upload(event.target.files?.[0]); event.target.value = ''; }} /></label></div>
+        <div className="adm-gallery">
+          {form.images.map((src, i) => <div className={`adm-gallery-item ${i === 0 ? 'main' : ''}`} key={src}><Thumb src={src} />{i === 0 ? <span className="adm-gallery-tag">Main</span> : <button type="button" aria-label={`Make photo ${i + 1} the main photo`} title="Make main" onClick={() => change({ images: [src, ...form.images.filter(x => x !== src)] })}><Star size={13} /></button>}<button type="button" className="remove" aria-label={`Remove photo ${i + 1}`} title="Remove" onClick={() => change({ images: form.images.filter(x => x !== src) })}><X size={13} /></button></div>)}
+          {!form.images.length && <div className="adm-gallery-item"><Thumb src={familyImage(form.family)} /></div>}
+          <label className="adm-upload">{uploading || <><ImagePlus size={15} /> Add photos</>}<input type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={!!uploading} aria-label="Add photos" onChange={event => { void upload(event.target.files); event.target.value = ''; }} /></label>
+        </div>
         <fieldset className="adm-fields">
           <label className="adm-field">Product name<input value={form.name} maxLength={150} required onChange={event => change({ name: event.target.value })} /></label>
           <label className="adm-field half">Fragrance family<input list="adm-families" value={form.family} maxLength={40} placeholder="e.g. Oud" required onChange={event => change({ family: event.target.value })} /><datalist id="adm-families">{familyNames.map(n => <option key={n} value={n} />)}</datalist></label>
@@ -171,7 +179,7 @@ export default function Products() {
           <label className="adm-field half">Accent colour<input type="color" value={form.color} onChange={event => change({ color: event.target.value })} /></label>
         </fieldset>
         {error && <p className="adm-form-error" role="alert">{error}</p>}
-        <div className="adm-form-actions"><button type="button" className="adm-btn ghost" onClick={() => setEditing(null)}>Cancel</button><button type="submit" className="adm-btn" disabled={uploading}>{editing === 'new' ? 'Create product' : 'Save changes'}</button></div>
+        <div className="adm-form-actions"><button type="button" className="adm-btn ghost" onClick={() => setEditing(null)}>Cancel</button><button type="submit" className="adm-btn" disabled={!!uploading}>{editing === 'new' ? 'Create product' : 'Save changes'}</button></div>
       </form>
     </Drawer>
     <Confirm open={!!doomed} title="Delete this product?" body={doomed ? `“${doomed.name}” and all its sizes will be deleted. Past orders keep their details.` : ''} action="Delete" onCancel={() => setDoomed(null)} onConfirm={() => doomed && remove(doomed)} />

@@ -89,6 +89,8 @@ export const products = pgTable('products', {
   mood: text('mood').notNull(),
   description: text('description').notNull(),
   image: text('image').notNull(),
+  /** More photos for the product page, after the main `image`. */
+  images: jsonb('images').$type<string[]>().notNull().default([]),
   /** 50 ml list price. Each size's selling price lives on its variant. */
   price: integer('price').notNull(),
   color: text('color').notNull(),
@@ -118,6 +120,8 @@ export const collections = pgTable('collections', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
+  /** Photo for the collection card and page; empty uses the family's stock photo. */
+  image: text('image'),
   position: integer('position').notNull(),
   featured: boolean('featured').notNull().default(false),
   status: text('status').notNull().default('Visible'),
@@ -134,6 +138,10 @@ export const mediaSlots = pgTable('media_slots', {
 // ---- Orders ---------------------------------------------------------------------------------
 
 export type OrderAddress = { line: string; city: string; state: string; pincode: string };
+/** A gift order's packing details, copied at purchase. */
+/** The courier the shopper's delivery price came from. */
+export type ShipChoice = { courierId: number | null; courier: string; price: number; eta: string };
+export type OrderGift = { basket: string; card: string; to: string; from: string; message: string; items: string[] };
 
 export const orders = pgTable('orders', {
   id: text('id').primaryKey(),
@@ -163,6 +171,9 @@ export const orders = pgTable('orders', {
   paymentId: text('payment_id'),
   /** Stock is held for unpaid orders until this time. */
   expiresAt: timestamp('expires_at', { withTimezone: true }),
+  /** The gift basket's price and what to pack; the charge is part of `total`. */
+  giftCharge: integer('gift_charge').notNull().default(0),
+  gift: jsonb('gift').$type<OrderGift>(),
   total: integer('total').notNull(),
   /** Shiprocket order and shipment ids, once the order has been sent there. */
   shipRef: text('ship_ref'),
@@ -175,6 +186,7 @@ export const orders = pgTable('orders', {
   /** Why the order could not be sent to Shiprocket; cleared on success. */
   shipError: text('ship_error'),
   shipSyncedAt: timestamp('ship_synced_at', { withTimezone: true }),
+  shipChoice: jsonb('ship_choice').$type<ShipChoice>(),
   createdAt: created(),
   updatedAt: updated(),
 }, t => [

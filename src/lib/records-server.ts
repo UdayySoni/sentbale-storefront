@@ -4,7 +4,7 @@ import { db, schema as s, type Db as Database, type Tx } from '@/db';
 import { seed } from './admin/seed';
 import type { Db } from './admin/types';
 
-type RecordList = 'coupons' | 'reviews' | 'posts' | 'zones' | 'partners' | 'methods' | 'roles';
+type RecordList = 'baskets' | 'coupons' | 'reviews' | 'posts' | 'zones' | 'partners' | 'methods' | 'roles';
 type Source = Database | Tx;
 
 /** Rows of an admin-managed section that is stored as generic records. */

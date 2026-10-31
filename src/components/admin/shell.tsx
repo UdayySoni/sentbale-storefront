@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Archive, Bell, Box, ChevronDown, ChevronRight, Clock, CreditCard, ExternalLink, FileText, House, LayoutGrid, LayoutTemplate, LogOut, Menu, Package, Search, Settings, ShieldCheck, ShoppingBag, Star, Tag, Truck, Users, type LucideIcon } from 'lucide-react';
+import { Archive, Bell, Box, ChevronDown, ChevronRight, Clock, CreditCard, ExternalLink, FileText, Gift, Send, House, LayoutGrid, LayoutTemplate, LogOut, Menu, Package, Search, Settings, ShieldCheck, ShoppingBag, Star, Tag, Truck, Users, type LucideIcon } from 'lucide-react';
 import { nav } from '@/lib/admin/nav';
 import { onStoreError, onStoreNotice, patchDb, setActor, useDb } from '@/lib/admin/store';
 import { isLowStock } from '@/lib/admin/types';
@@ -29,7 +29,7 @@ function StoreMessages() {
   </Drawer>;
 }
 
-const icons: Record<string, LucideIcon> = { dashboard: House, products: Package, collections: LayoutGrid, orders: ShoppingBag, customers: Users, inventory: Archive, coupons: Tag, reviews: Star, journal: FileText, homepage: LayoutTemplate, shipping: Truck, payments: CreditCard, settings: Settings, roles: ShieldCheck, audit: Clock };
+const icons: Record<string, LucideIcon> = { dashboard: House, products: Package, collections: LayoutGrid, orders: ShoppingBag, customers: Users, inventory: Archive, gifts: Gift, shipments: Send, coupons: Tag, reviews: Star, journal: FileText, homepage: LayoutTemplate, shipping: Truck, payments: CreditCard, settings: Settings, roles: ShieldCheck, audit: Clock };
 const IDLE_LIMIT = 30 * 60 * 1000;
 type AdminUser = { name: string; email: string; role: string };
 

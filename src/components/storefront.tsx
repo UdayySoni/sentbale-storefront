@@ -9,11 +9,12 @@ import { defaultMedia } from '@/lib/media';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowRight, ArrowUpRight, ArrowLeft, Search, UserRound, ShoppingBag, Menu, X, Heart, Plus, Minus, Check, Leaf, Sparkles, Gift, ChevronDown, SlidersHorizontal, Trash2, Mail, LockKeyhole, CheckCircle2 } from 'lucide-react';
-import { families, firstSize, fromPrice, priceFor, money, sizesOf, type Product, type Size } from '@/lib/catalog';
+import { familyPhoto, firstSize, fromPrice, priceFor, money, sizesOf, type Product, type Size } from '@/lib/catalog';
 import { useStore, type DemoOrder } from '@/lib/store';
 import { useContent } from './content-provider';
 import ProductReviews from './product-reviews';
 import { ResetPassword } from './password-reset';
+import { GiftBuilder } from './gift-builder';
 
 type Store = ReturnType<typeof useStore>;
 const nav = [['Home', '/'], ['Shop', '/shop'], ['Collections', '/collections'], ['Our Story', '/our-story'], ['Journal', '/journal']];
@@ -47,6 +48,8 @@ export default function Storefront() {
   const [query, setQuery] = useState('');
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const home = path === '/';
+  const giftsOn = content.homepage.showGifts && content.baskets.length > 0 && products.length > 0;
+  const links = giftsOn ? [...nav.slice(0, 2), ['Gifts', '/#gift'], ...nav.slice(2)] : nav;
   useEffect(() => { setOverlay(null); setQuick(null); }, [path]);
   useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
   function notify(message: string) { setToast(message); if (toastTimer.current) clearTimeout(toastTimer.current); toastTimer.current = setTimeout(() => setToast(''), 3500); }
@@ -55,7 +58,7 @@ export default function Storefront() {
   const card = (p: Product) => <ProductCard key={p.id} product={p} saved={store.wishlist.includes(p.id)} wish={() => wish(p.id)} quick={() => setQuick(p)} />;
 
   let page: ReactNode;
-  if (home) page = <Home card={card} quiz={() => setOverlay('quiz')} />;
+  if (home) page = <Home card={card} quiz={() => setOverlay('quiz')} store={store} giftDone={() => setOverlay('cart')} gifts={giftsOn} />;
   else if (path === '/shop' || path.startsWith('/collections/')) page = <Shop path={path} card={card} />;
   else if (path === '/collections') page = <Collections />;
   else if (path.startsWith('/product/')) {
@@ -83,7 +86,7 @@ export default function Storefront() {
       <header className="header">
         <button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setOverlay('menu')}><Menu size={23} /></button>
         <Link href="/" className="wordmark" aria-label="SENTBALE home">SENTBALE<span>PARFUMS</span></Link>
-        <nav aria-label="Main navigation">{nav.map(([label, href]) => <Link href={href} key={href} className={(href === '/' ? home : path.startsWith(href)) ? 'active' : ''}>{label}</Link>)}</nav>
+        <nav aria-label="Main navigation">{links.map(([label, href]) => <Link href={href} key={href} className={(href === '/' ? home : path.startsWith(href)) ? 'active' : ''}>{label}</Link>)}</nav>
         <div className="header-actions"><button className="icon-button" aria-label="Search fragrances" onClick={() => setOverlay('search')}><Search size={21} /></button><Link className="icon-button account-icon" aria-label="My account" href="/account"><UserRound size={21} /></Link><button className="icon-button bag-button" aria-label={`Open bag, ${store.count} items`} onClick={() => setOverlay('cart')}><ShoppingBag size={21} /><span>{store.count}</span></button></div>
       </header>
     </div>
@@ -93,20 +96,20 @@ export default function Storefront() {
     {store.storageError && <p className="storage-note" role="status">Browser storage is unavailable. Your bag will last for this visit only.</p>}
     <div className={`toast ${toast ? 'visible' : ''}`} role="status">{toast && <><CheckCircle2 size={17} />{toast}</>}</div>
     <Modal open={overlay === 'cart'} close={() => setOverlay(null)} title={`Your bag (${store.count})`} side>
-      {store.cart.length ? <><CartLines store={store} /><div className="drawer-summary"><div><span>Subtotal</span><strong>{money(store.total)}</strong></div><p>Delivery calculated at checkout.</p><Link href="/checkout" onClick={() => setOverlay(null)} className="button">Checkout <ArrowRight size={17} /></Link><Link className="text-link centered" href="/cart" onClick={() => setOverlay(null)}>View bag</Link></div></> : <Empty title="Your bag is empty" action={() => setOverlay(null)} />}
+      {store.count ? <><CartLines store={store} close={() => setOverlay(null)} /><div className="drawer-summary"><div><span>Subtotal</span><strong>{money(store.total)}</strong></div><p>Delivery calculated at checkout.</p><Link href="/checkout" onClick={() => setOverlay(null)} className="button">Checkout <ArrowRight size={17} /></Link><Link className="text-link centered" href="/cart" onClick={() => setOverlay(null)}>View bag</Link></div></> : <Empty title="Your bag is empty" action={() => setOverlay(null)} />}
     </Modal>
     <Modal open={overlay === 'search'} close={() => setOverlay(null)} title="Search">
       <label className="search-input"><Search size={20} /><input autoComplete="off" autoFocus={overlay === 'search'} value={query} onChange={e => setQuery(e.target.value)} placeholder="Fragrance, note or family" aria-label="Search" /></label>
       <div className="search-results">{products.filter(p => `${p.name} ${p.family} ${p.notes.flat().join(' ')}`.toLowerCase().includes(query.toLowerCase().trim())).map(p => <Link href={`/product/${p.id}`} key={p.id} onClick={() => setOverlay(null)}><div className="search-image"><Photo src={p.image} alt={p.name} sizes="80px" /></div><div><h3>{p.name}</h3><p>{p.family}</p></div><ArrowUpRight size={20} /></Link>)}</div>
       {products.every(p => !`${p.name} ${p.family} ${p.notes.flat().join(' ')}`.toLowerCase().includes(query.toLowerCase().trim())) && <p className="muted">No matches.</p>}
     </Modal>
-    <Modal open={overlay === 'menu'} close={() => setOverlay(null)} title="SENTBALE" side><nav className="mobile-nav">{[...nav, ['My account', '/account'], ['Contact', '/contact']].map(([label, href]) => <Link href={href} key={href} onClick={() => setOverlay(null)}>{label}<ArrowUpRight size={23} /></Link>)}</nav></Modal>
+    <Modal open={overlay === 'menu'} close={() => setOverlay(null)} title="SENTBALE" side><nav className="mobile-nav">{[...links, ['My account', '/account'], ['Contact', '/contact']].map(([label, href]) => <Link href={href} key={href} onClick={() => setOverlay(null)}>{label}<ArrowUpRight size={23} /></Link>)}</nav></Modal>
     <Modal open={overlay === 'quiz'} close={() => setOverlay(null)} title="Find your scent"><ScentFinder close={() => setOverlay(null)} /></Modal>
     <Modal open={!!quick} close={() => setQuick(null)} title={quick?.name || 'Quick view'}>{quick && <QuickView key={quick.id} product={products.find(p => p.id === quick.id) || quick} add={add} />}</Modal>
   </>;
 }
 
-function Home({ card, quiz }: { card: (p: Product) => ReactNode; quiz: () => void }) {
+function Home({ card, quiz, store, giftDone, gifts }: { card: (p: Product) => ReactNode; quiz: () => void; store: Store; giftDone: () => void; gifts: boolean }) {
   const products = useProducts();
   const { homepage } = useContent();
   const shown = useFamilies();
@@ -122,23 +125,22 @@ function Home({ card, quiz }: { card: (p: Product) => ReactNode; quiz: () => voi
     <section className="promise-strip" aria-label="Why SENTBALE"><div><Leaf /><span>Inspired by nature</span></div><div><Sparkles /><span>Made for you</span></div><div><Gift /><span>Gift-ready</span></div><Link href="/our-story">Our story <ArrowUpRight size={15} /></Link></section>
     <section className="section collections-section"><div className="section-heading"><div><h2>Shop by <em>family.</em></h2></div><Link href="/collections" className="text-link">View all <ArrowUpRight size={17} /></Link></div><div className="collection-grid">{shown.map(f => <CollectionCard key={f.id} family={f} />)}</div></section>
     <section className="section featured-section"><div className="section-heading"><div><h2>The <em>collection.</em></h2></div><Link href="/shop" className="text-link">Shop all <ArrowUpRight size={17} /></Link></div><div className="product-grid">{featured.map(card)}</div></section>
+    {gifts && <GiftBuilder store={store} done={giftDone} />}
     <section className="story-split"><div className="story-visual"><Photo slot="home.story" src="/images/hero.png" alt="Amber light falling across a rocky fragrance landscape" /></div><div className="story-copy"><h2>A fragrance<br />for every <em>story.</em></h2><p>Scents made for the moments that stay with you.</p><Link href="/our-story" className="text-link">Our story <ArrowUpRight size={18} /></Link></div></section>
     {homepage.showFinder && <section className="scent-banner"><div className="scent-emblem"><Sparkles size={42} strokeWidth={1} /></div><div><h2>Not sure where <em>to start?</em></h2></div><button className="button" onClick={quiz}>Find my scent <ArrowRight size={17} /></button></section>}
     {homepage.showJournal && <section className="section journal-section"><div className="section-heading"><div><h2>The <em>journal.</em></h2></div><Link href="/journal" className="text-link">Read more <ArrowUpRight size={17} /></Link></div><JournalCards limit={3} /></section>}
   </>;
 }
 
-type Family = { id: string; name: string; description: string; image: string; number: string };
-/** The collections the admin has left visible that have products, in the admin's order and wording. */
+type Family = { id: string; name: string; description: string; image: string; custom: boolean; number: string };
+/** The collections the admin has left visible, in the admin's order and wording, each with its general photo. */
 function useFamilies(): Family[] {
   const { collections } = useContent();
   const products = useProducts();
-  return collections.flatMap(c => {
-    const own = products.filter(p => p.family.toLowerCase() === c.name.toLowerCase());
-    if (!own.length) return [];
-    const known = families.find(f => f.name.toLowerCase() === c.name.toLowerCase());
-    return [{ id: c.id, name: c.name, description: c.description || known?.description || '', image: known?.image || own[0].image, number: '' }];
-  }).map((f, i) => ({ ...f, number: String(i + 1).padStart(2, '0') }));
+  return collections.map((c, i) => ({
+    id: c.id, name: c.name, description: c.description, custom: !!c.image, number: String(i + 1).padStart(2, '0'),
+    image: c.image || familyPhoto(c.name) || products.find(p => p.family.toLowerCase() === c.name.toLowerCase())?.image || '/images/hero.png',
+  }));
 }
 /** Products in the homepage's "featured" order (names separated by commas); all of them when none are named. */
 function featuredProducts(products: Product[], featured: string) {
@@ -154,7 +156,7 @@ function HeroCopy() {
 }
 
 function CollectionCard({ family: f }: { family: Family }) {
-  return <Link href={`/collections/${f.id}`} className={`collection-card collection-${f.id}`}><Photo slot={`collection.${f.id}`} src={f.image} alt={`${f.name} fragrance collection`} sizes="(max-width: 700px) 50vw, 25vw" /><div className="collection-scrim" /><span className="collection-number">{f.number} /</span><div className="collection-caption"><h3>{f.name}</h3>{f.description && <p>{f.description}</p>}</div><ArrowUpRight className="collection-arrow" size={21} /></Link>;
+  return <Link href={`/collections/${f.id}`} className={`collection-card collection-${f.id}`}><Photo slot={f.custom ? undefined : `collection.${f.id}`} src={f.image} alt={`${f.name} fragrance collection`} sizes="(max-width: 700px) 50vw, 25vw" /><div className="collection-scrim" /><span className="collection-number">{f.number} /</span><div className="collection-caption"><h3>{f.name}</h3>{f.description && <p>{f.description}</p>}</div><ArrowUpRight className="collection-arrow" size={21} /></Link>;
 }
 function ProductCard({ product: p, saved, wish, quick }: { product: Product; saved: boolean; wish: () => void; quick: () => void }) {
   const from = fromPrice(p), several = sizesOf(p).length > 1;
@@ -174,10 +176,10 @@ function Shop({ path, card }: { path: string; card: (p: Product) => ReactNode })
   const low = (p: Product) => fromPrice(p).price;
   const shown = products.filter(p => filter === 'All' || p.family.toLowerCase() === filter.toLowerCase()).sort((a, b) => sort === 'low' ? low(a) - low(b) : sort === 'high' ? low(b) - low(a) : sort === 'name' ? a.name.localeCompare(b.name) : 0);
   const current = shownFamilies.find(f => f.id === slug);
-  return <><PageHero imageSlot={slug ? `collection.${slug}` : 'page.hero'} title={initial === 'All' ? 'Shop all' : initial} text={current?.description} />{slug && <CollectionIntro family={initial} />}<section className="section shop-section"><div className="shop-toolbar"><button className="filter-toggle text-link" onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}><SlidersHorizontal size={17} /> Family</button><div className={`filter-tabs ${showFilters ? 'show' : ''}`}>{['All', ...shownFamilies.map(f => f.name)].map(f => <button key={f} className={filter === f ? 'selected' : ''} onClick={() => setFilter(f)}>{f}</button>)}</div><label className="sort-select"><span className="sr-only">Sort fragrances</span><select value={sort} onChange={e => setSort(e.target.value)}><option value="featured">Featured</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name: A–Z</option></select><ChevronDown size={15} /></label></div><p className="result-count">{shown.length} {shown.length === 1 ? 'fragrance' : 'fragrances'}</p><div className="product-grid">{shown.map(card)}</div></section></>;
+  return <><PageHero imageSlot={current?.custom ? undefined : slug ? `collection.${slug}` : 'page.hero'} src={current?.image} title={initial === 'All' ? 'Shop all' : initial} text={current?.description} />{slug && <CollectionIntro family={initial} />}<section className="section shop-section"><div className="shop-toolbar"><button className="filter-toggle text-link" onClick={() => setShowFilters(!showFilters)} aria-expanded={showFilters}><SlidersHorizontal size={17} /> Family</button><div className={`filter-tabs ${showFilters ? 'show' : ''}`}>{['All', ...shownFamilies.map(f => f.name)].map(f => <button key={f} className={filter === f ? 'selected' : ''} onClick={() => setFilter(f)}>{f}</button>)}</div><label className="sort-select"><span className="sr-only">Sort fragrances</span><select value={sort} onChange={e => setSort(e.target.value)}><option value="featured">Featured</option><option value="low">Price: low to high</option><option value="high">Price: high to low</option><option value="name">Name: A–Z</option></select><ChevronDown size={15} /></label></div><p className="result-count">{shown.length} {shown.length === 1 ? 'fragrance' : 'fragrances'}</p>{shown.length ? <div className="product-grid">{shown.map(card)}</div> : <p className="muted">Coming soon.</p>}</section></>;
 }
-function PageHero({ eyebrow, title, text, imageSlot = 'page.hero' }: { eyebrow?: string; title: string; text?: string; imageSlot?: string }) {
-  return <section className="page-hero"><Photo slot={imageSlot} src={defaultMedia.images[imageSlot]?.src || '/images/hero.png'} alt="" priority sizes="100vw" /><div className="page-hero-shade" /><div>{eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}<h1>{title}</h1>{text && <p>{text}</p>}</div></section>;
+function PageHero({ eyebrow, title, text, imageSlot = 'page.hero', src }: { eyebrow?: string; title: string; text?: string; imageSlot?: string; src?: string }) {
+  return <section className="page-hero"><Photo slot={imageSlot} src={src || defaultMedia.images[imageSlot]?.src || '/images/hero.png'} alt="" priority sizes="100vw" /><div className="page-hero-shade" /><div>{eyebrow && <Eyebrow>{eyebrow}</Eyebrow>}<h1>{title}</h1>{text && <p>{text}</p>}</div></section>;
 }
 function Collections() {
   const shown = useFamilies();
@@ -199,16 +201,26 @@ function ProductPage({ product: p, add, saved, wish, card }: { product: Product;
   const [size, setSize] = useState<Size>(() => firstSize(p));
   const [quantity, setQuantity] = useState(1);
   const hasNotes = p.notes.some(n => n.length > 0);
-  return <div className="product-page"><div className="breadcrumbs"><Link href="/">Home</Link><span>/</span><Link href="/shop">Shop</Link><span>/</span>{p.name}</div><section className="product-detail"><div className="detail-photo"><Photo src={p.image} alt={`${p.name} perfume bottle`} priority /></div><div className="detail-copy"><Eyebrow>{p.family} · Eau de Parfum</Eyebrow><h1>{p.name}</h1><p className="detail-tagline">{p.mood}</p><p className="detail-description">{p.description}</p><div className="detail-price">{money(priceFor(p, size))}<span>Incl. of all taxes</span></div><div className="size-heading"><span>Size</span></div><SizeSelector product={p} value={size} change={setSize} /><div className="detail-buy"><Quantity value={quantity} change={setQuantity} />{p.soldOut?.includes(size) ? <button className="button" disabled>Sold out</button> : <button className="button" onClick={() => add(p.id, size, quantity)}>Add to bag <Plus size={18} /></button>}<button className={`icon-button detail-wish ${saved ? 'saved' : ''}`} onClick={wish} aria-label={`${saved ? 'Remove from' : 'Save to'} favourites`} aria-pressed={saved}><Heart fill={saved ? 'currentColor' : 'none'} /></button></div>{hasNotes && <div className="notes-mini">{['Top', 'Heart', 'Base'].map((n, i) => p.notes[i].length > 0 && <div key={n}><strong>{n}</strong><span>{p.notes[i].join(' · ')}</span></div>)}</div>}</div></section><ProductReviews product={p} />{products.length > 1 && <section className="section"><div className="section-heading"><div><h2>You may also <em>love.</em></h2></div></div><div className="product-grid three">{products.filter(other => other.id !== p.id).slice(0, 3).map(card)}</div></section>}</div>;
+  const gallery = [p.image, ...(p.images ?? [])];
+  const [shown, setShown] = useState(0);
+  const photo = gallery[shown] ?? p.image;
+  return <div className="product-page"><div className="breadcrumbs"><Link href="/">Home</Link><span>/</span><Link href="/shop">Shop</Link><span>/</span>{p.name}</div><section className="product-detail"><div className="detail-gallery"><div className="detail-photo"><Photo key={photo} src={photo} alt={`${p.name} perfume bottle`} priority /></div>{gallery.length > 1 && <div className="detail-thumbs">{gallery.map((src, i) => <button key={src} type="button" className={i === shown ? 'selected' : ''} aria-label={`Show photo ${i + 1} of ${gallery.length}`} aria-pressed={i === shown} onClick={() => setShown(i)}><Photo src={src} alt="" sizes="90px" /></button>)}</div>}</div><div className="detail-copy"><Eyebrow>{p.family} · Eau de Parfum</Eyebrow><h1>{p.name}</h1><p className="detail-tagline">{p.mood}</p><p className="detail-description">{p.description}</p><div className="detail-price">{money(priceFor(p, size))}<span>Incl. of all taxes</span></div><div className="size-heading"><span>Size</span></div><SizeSelector product={p} value={size} change={setSize} /><div className="detail-buy"><Quantity value={quantity} change={setQuantity} />{p.soldOut?.includes(size) ? <button className="button" disabled>Sold out</button> : <button className="button" onClick={() => add(p.id, size, quantity)}>Add to bag <Plus size={18} /></button>}<button className={`icon-button detail-wish ${saved ? 'saved' : ''}`} onClick={wish} aria-label={`${saved ? 'Remove from' : 'Save to'} favourites`} aria-pressed={saved}><Heart fill={saved ? 'currentColor' : 'none'} /></button></div>{hasNotes && <div className="notes-mini">{['Top', 'Heart', 'Base'].map((n, i) => p.notes[i].length > 0 && <div key={n}><strong>{n}</strong><span>{p.notes[i].join(' · ')}</span></div>)}</div>}</div></section><ProductReviews product={p} />{products.length > 1 && <section className="section"><div className="section-heading"><div><h2>You may also <em>love.</em></h2></div></div><div className="product-grid three">{products.filter(other => other.id !== p.id).slice(0, 3).map(card)}</div></section>}</div>;
 }
 
-function CartLines({ store }: { store: Store }) {
+function CartLines({ store, close }: { store: Store; close?: () => void }) {
   const products = useProducts();
-  return <div className="cart-lines">{store.cart.map(line => {
+  return <div className="cart-lines">{store.gift && <GiftLine store={store} close={close} />}{store.cart.map(line => {
     const p = products.find(p => p.id === line.id);
     if (!p) return null;
     return <div className="cart-line" key={`${line.id}-${line.size}`}><Link href={`/product/${p.id}`} className="cart-thumb"><Photo src={p.image} alt={p.name} sizes="120px" /></Link><div className="cart-line-copy"><Link href={`/product/${p.id}`}><h3>{p.name}</h3></Link><p>{line.size} ml</p><button className="save-later" onClick={() => { if (!store.wishlist.includes(p.id)) store.toggleWish(p.id); store.quantity(line.id, line.size, 0); }}><Heart size={12} /> Save for later</button><Quantity value={line.quantity} change={q => store.quantity(line.id, line.size, q)} label={`${p.name} ${line.size} ml quantity`} /></div><div className="cart-line-price"><strong>{money(priceFor(p, line.size) * line.quantity)}</strong><button className="icon-button" onClick={() => store.quantity(line.id, line.size, 0)} aria-label={`Remove ${p.name} ${line.size} ml`}><Trash2 size={17} /></button></div></div>;
   })}</div>;
+}
+/** The gift in the bag: everything in it travels together, so it is edited or removed as one. */
+function GiftLine({ store, close }: { store: Store; close?: () => void }) {
+  const products = useProducts();
+  const gift = store.gift!;
+  const perfumes = gift.items.reduce((sum, l) => { const p = products.find(x => x.id === l.id); return sum + (p ? priceFor(p, l.size) * l.quantity : 0); }, 0);
+  return <div className="cart-line gift-line"><div className="cart-line-copy"><h3><Gift size={18} strokeWidth={1.4} /> {gift.basket.name}</h3><p>{gift.items.map(l => `${l.quantity} × ${products.find(p => p.id === l.id)?.name ?? l.id} ${l.size} ml`).join(', ')}</p><p>To {gift.to}, from {gift.from}</p><Link className="save-later" href="/#gift" onClick={close}>Edit gift</Link></div><div className="cart-line-price"><strong>{money(perfumes + gift.basket.price)}</strong><button className="icon-button" onClick={() => store.setGift(null)} aria-label="Remove gift"><Trash2 size={17} /></button></div></div>;
 }
 function Empty({ title, text, action }: { title: string; text?: string; action?: () => void }) {
   return <div className="empty-state"><ShoppingBag size={40} strokeWidth={1} /><h2>{title}</h2>{text && <p>{text}</p>}<Link className="button" href="/shop" onClick={action}>Shop fragrances <ArrowRight size={17} /></Link></div>;
@@ -216,14 +228,15 @@ function Empty({ title, text, action }: { title: string; text?: string; action?:
 function CartPage({ store }: { store: Store }) {
   const products = useProducts();
   const pairings = products.filter(p => !store.cart.some(l => l.id === p.id)).slice(0, 3);
-  return <section className="section cart-page"><div className="section-heading"><h1>Your bag<span className="heading-count">({store.count})</span></h1><Link href="/shop" className="text-link">Keep shopping <ArrowRight size={17} /></Link></div>{store.cart.length ? <div className="cart-layout"><CartLines store={store} /><aside className="order-summary"><h2>Summary</h2><div className="summary-row"><span>Subtotal</span><span>{money(store.total)}</span></div><div className="summary-row"><span>Delivery</span><span>At checkout</span></div><div className="summary-row total"><span>Total</span><strong>{money(store.total)}</strong></div><ButtonLink href="/checkout">Checkout</ButtonLink><p className="checkout-note"><LockKeyhole size={14} /> Secure checkout</p></aside></div> : <Empty title="Your bag is empty" />}{store.cart.length > 0 && pairings.length > 0 && <div className="cart-recommendations"><h2>You may also <em>like.</em></h2><div className="bag-pairings">{pairings.map(p => { const from = fromPrice(p); return <div className="bag-pairing" key={p.id}><Link className="cart-thumb" href={`/product/${p.id}`}><Photo src={p.image} alt={p.name} sizes="80px" /></Link><div><h3>{p.name}</h3><p>{p.family} · {money(from.price)}</p><button className="text-link" onClick={() => store.add(p.id, from.size, 1)}>Add {from.size} ml <Plus size={14}/></button></div></div>; })}</div></div>}</section>;
+  return <section className="section cart-page"><div className="section-heading"><h1>Your bag<span className="heading-count">({store.count})</span></h1><Link href="/shop" className="text-link">Keep shopping <ArrowRight size={17} /></Link></div>{store.count ? <div className="cart-layout"><CartLines store={store} /><aside className="order-summary"><h2>Summary</h2><div className="summary-row"><span>Subtotal</span><span>{money(store.total)}</span></div><div className="summary-row"><span>Delivery</span><span>At checkout</span></div><div className="summary-row total"><span>Total</span><strong>{money(store.total)}</strong></div><ButtonLink href="/checkout">Checkout</ButtonLink><p className="checkout-note"><LockKeyhole size={14} /> Secure checkout</p></aside></div> : <Empty title="Your bag is empty" />}{store.count > 0 && pairings.length > 0 && <div className="cart-recommendations"><h2>You may also <em>like.</em></h2><div className="bag-pairings">{pairings.map(p => { const from = fromPrice(p); return <div className="bag-pairing" key={p.id}><Link className="cart-thumb" href={`/product/${p.id}`}><Photo src={p.image} alt={p.name} sizes="80px" /></Link><div><h3>{p.name}</h3><p>{p.family} · {money(from.price)}</p><button className="text-link" onClick={() => store.add(p.id, from.size, 1)}>Add {from.size} ml <Plus size={14}/></button></div></div>; })}</div></div>}</section>;
 }
 
 type CheckoutQuote = {
   lines: { id: string; size: Size; quantity: number; name: string; image: string; unitPrice: number }[];
-  subtotal: number; discount: number; shipping: number; tax: number; taxRate: number; taxIncluded: boolean; total: number;
+  needsPincode: boolean;
+  subtotal: number; discount: number; giftCharge: number; giftBasket: string | null; shipping: number; tax: number; taxRate: number; taxIncluded: boolean; total: number;
   coupon: { code: string; applied: boolean; message: string } | null;
-  delivery: { id: 'standard' | 'express'; label: string; eta: string; price: number }[];
+  delivery: { id: 'standard' | 'express'; label: string; courier: string; eta: string; price: number }[];
   deliverable: boolean; problems: string[];
 };
 type RazorpayResult = { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string };
@@ -261,19 +274,23 @@ function Checkout({ store }: { store: Store }) {
   const [processing, setProcessing] = useState(false);
   const locked = useRef(false);
 
+  const giftBody = store.gift && { ...store.gift, basket: store.gift.basket.id };
   // Totals always come from the server, so what is shown is what is charged.
   useEffect(() => {
-    if (!store.ready || !store.cart.length) return;
+    if (!store.ready || !store.count) return;
     let active = true;
     const timer = setTimeout(async () => {
       try {
-        const response = await fetch('/api/checkout/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: store.cart, delivery, state, pincode, coupon }) });
+        const response = await fetch('/api/checkout/quote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ items: store.cart, gift: giftBody, delivery, state, pincode, coupon }) });
         const data = await response.json();
         if (active && response.ok) setQuote(data);
       } catch { /* Keep the last totals; the order itself is priced on the server. */ }
     }, 250);
     return () => { active = false; clearTimeout(timer); };
-  }, [store.cart, store.ready, delivery, state, pincode, coupon]);
+  }, [store.cart, store.gift, store.ready, delivery, state, pincode, coupon]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A pincode served by one courier has no express option, so fall back to the one it has.
+  useEffect(() => { if (quote && !quote.delivery.some(o => o.id === delivery)) setDelivery('standard'); }, [quote, delivery]);
 
   async function payOnline(data: { order: DemoOrder; razorpay: { keyId: string; orderId: string; amount: number; currency: string; name: string; email: string; phone: string } }) {
     const Razorpay = await razorpayScript();
@@ -297,7 +314,7 @@ function Checkout({ store }: { store: Store }) {
     const fields = new FormData(e.currentTarget);
     locked.current = true; setProcessing(true); setMessage('');
     try {
-      const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: requestId.current, items: store.cart, delivery, payment, coupon: quote?.coupon?.applied ? coupon : '', name: fields.get('name'), phone: fields.get('phone'), address: { line: fields.get('address'), city: fields.get('city'), state: fields.get('state'), pincode: fields.get('pincode') } }) });
+      const response = await fetch('/api/orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requestId: requestId.current, items: store.cart, gift: giftBody, delivery, payment, coupon: quote?.coupon?.applied ? coupon : '', name: fields.get('name'), phone: fields.get('phone'), address: { line: fields.get('address'), city: fields.get('city'), state: fields.get('state'), pincode: fields.get('pincode') } }) });
       const data = await response.json(); if (!response.ok) throw new Error(data.error);
       const order = data.razorpay ? await payOnline(data) : data.order;
       setComplete(order); store.clear();
@@ -312,31 +329,32 @@ function Checkout({ store }: { store: Store }) {
   }
   if (!account.loaded) return <section className="section"><p>Preparing your checkout…</p></section>;
   if (!account.user) return <section className="section empty-state"><LockKeyhole size={38} strokeWidth={1}/><h1>Sign in to checkout</h1><p>Your bag will be waiting.</p><ButtonLink href="/account?next=checkout">Sign in or create account</ButtonLink></section>;
-  if (!store.cart.length) return <section className="section"><Empty title="Your bag is empty" /></section>;
-  const options = quote?.delivery ?? [{ id: 'standard' as const, label: 'Standard delivery', eta: '3–5 business days', price: 0 }, { id: 'express' as const, label: 'Express delivery', eta: '1–2 business days', price: 199 }];
-  const total = quote?.total ?? store.total + (options.find(o => o.id === delivery)?.price ?? 0);
+  if (!store.count) return <section className="section"><Empty title="Your bag is empty" /></section>;
+  const options = quote && !quote.needsPincode ? quote.delivery : [];
+  const total = quote?.total ?? store.total;
   const blocked = !!quote && (quote.problems.length > 0 || !quote.deliverable);
   const label = payment === 'test' ? 'Place test order' : payment === 'cod' ? 'Place order' : `Pay ${money(total)}`;
   return <section className="section checkout-page"><h1>Checkout</h1>
     {payment === 'test' && <div className="demo-notice"><LockKeyhole size={17} /><span>Test checkout: no payment is taken.</span></div>}
     <form className="checkout-layout" onSubmit={submit}><div>
       <h2><span className="step-number">01</span> Your details</h2>
-      <div className="form-grid"><Field label="Full name" name="name" autoComplete="name" defaultValue={account.user.name} required /><Field label="Email address" name="email" type="email" autoComplete="email" defaultValue={account.user.email} readOnly required /><Field label="Phone number" name="phone" type="tel" pattern="[0-9+ ()-]{10,16}" autoComplete="tel" required /><Field label="Pincode" name="pincode" inputMode="numeric" pattern="[1-9][0-9]{5}" autoComplete="postal-code" required onBlur={e => { const value = e.currentTarget.value.trim(); setPincode(/^[1-9][0-9]{5}$/.test(value) ? value : ''); }} /><div className="full"><Field label="Delivery address" name="address" autoComplete="street-address" required /></div><Field label="City" name="city" autoComplete="address-level2" required /><Field label="State" name="state" autoComplete="address-level1" required onBlur={e => setState(e.currentTarget.value.trim())} /></div>
+      <div className="form-grid"><Field label="Full name" name="name" autoComplete="name" defaultValue={account.user.name} required /><Field label="Email address" name="email" type="email" autoComplete="email" defaultValue={account.user.email} readOnly required /><Field label="Phone number" name="phone" type="tel" pattern="[0-9+ ()-]{10,16}" autoComplete="tel" required /><Field label="Pincode" name="pincode" inputMode="numeric" pattern="[1-9][0-9]{5}" autoComplete="postal-code" required onChange={e => { const value = e.currentTarget.value.trim(); setPincode(/^[1-9][0-9]{5}$/.test(value) ? value : ''); }} /><div className="full"><Field label="Delivery address" name="address" autoComplete="street-address" required /></div><Field label="City" name="city" autoComplete="address-level2" required /><Field label="State" name="state" autoComplete="address-level1" required onBlur={e => setState(e.currentTarget.value.trim())} /></div>
       <h2><span className="step-number">02</span> Delivery</h2>
-      <div className="shipping-options">{options.map(o => <label key={o.id} className={delivery === o.id ? 'selected' : ''}><input type="radio" name="delivery" value={o.id} checked={delivery === o.id} onChange={() => setDelivery(o.id)} /><span><strong>{o.label}</strong><small>{o.eta}</small></span><span>{o.price ? money(o.price) : 'Complimentary'}</span></label>)}</div>
+      {options.length === 0 && <p className="muted">Enter your pincode to see delivery options.</p>}<div className="shipping-options">{options.map(o => <label key={o.id} className={delivery === o.id || options.length === 1 ? 'selected' : ''}><input type="radio" name="delivery" value={o.id} checked={delivery === o.id || options.length === 1} onChange={() => setDelivery(o.id)} /><span><strong>{o.label}</strong><small>{o.eta}{o.courier ? ` · ${o.courier}` : ''}</small></span><span>{o.price ? money(o.price) : 'Complimentary'}</span></label>)}</div>
       {quote && !quote.deliverable && <p className="form-message" role="alert">We don’t deliver to {state} yet.</p>}
       <h2><span className="step-number">03</span> Payment</h2>
       {choices.length > 1 && <div className="shipping-options">{choices.map(choice => <label key={choice} className={payment === choice ? 'selected' : ''}><input type="radio" name="payment" value={choice} checked={payment === choice} onChange={() => { setPayment(choice); setMessage(''); }} /><span><strong>{choice === 'razorpay' ? 'Pay online' : choice === 'cod' ? 'Cash on delivery' : 'Test payment'}</strong><small>{choice === 'razorpay' ? (content.payments.methods.filter(m => !/^(cod|cash on delivery)$/i.test(m)).join(' · ') || 'UPI · Cards · Net banking') : choice === 'cod' ? 'Pay the courier when your order arrives' : 'No money is taken'}</small></span></label>)}</div>}
       {payment === 'test' ? <label className="field">Preview a checkout outcome<select value={scenario} onChange={e => { setScenario(e.target.value); setMessage(''); }}><option value="success">Success — create a test order</option><option value="failed">Payment declined</option><option value="pending">Payment pending</option></select></label>
         : null}
       {message && <p className="form-message" role="alert">{message}</p>}</div>
-      <aside className="order-summary"><h2>Your order</h2>{store.cart.map(l => { const p = products.find(p => p.id === l.id); if (!p) return null; return <div className="checkout-item" key={`${l.id}-${l.size}`}><div className="cart-thumb"><Photo src={p.image} alt={p.name} sizes="70px" /></div><div><h3>{p.name}</h3><p>{l.size} ml · Qty {l.quantity}</p></div><strong>{money(priceFor(p, l.size) * l.quantity)}</strong></div>; })}
+      <aside className="order-summary"><h2>Your order</h2>{store.gift && <div className="checkout-item gift-item"><div><h3><Gift size={16} strokeWidth={1.4} /> {store.gift.basket.name}</h3><p>{store.gift.items.map(l => `${l.quantity} × ${products.find(p => p.id === l.id)?.name ?? l.id} ${l.size} ml`).join(', ')}</p><p>To {store.gift.to}, from {store.gift.from}</p></div></div>}{store.cart.map(l => { const p = products.find(p => p.id === l.id); if (!p) return null; return <div className="checkout-item" key={`${l.id}-${l.size}`}><div className="cart-thumb"><Photo src={p.image} alt={p.name} sizes="70px" /></div><div><h3>{p.name}</h3><p>{l.size} ml · Qty {l.quantity}</p></div><strong>{money(priceFor(p, l.size) * l.quantity)}</strong></div>; })}
         <div className="coupon-row"><label className="field">Gift or promo code<input value={couponInput} maxLength={20} onChange={e => setCouponInput(e.target.value.toUpperCase())} /></label><button type="button" className="text-link" onClick={() => setCoupon(couponInput.trim())} disabled={!couponInput.trim()}>Apply</button></div>
         {quote?.coupon && <p className={`coupon-message ${quote.coupon.applied ? 'ok' : ''}`} role="status">{quote.coupon.message}</p>}
         {quote?.problems.map(problem => <p key={problem} className="form-message" role="alert">{problem}</p>)}
         <div className="summary-row"><span>Subtotal</span><span>{money(quote?.subtotal ?? store.total)}</span></div>
         {!!quote?.discount && <div className="summary-row"><span>Discount ({quote.coupon?.code})</span><span>−{money(quote.discount)}</span></div>}
-        <div className="summary-row"><span>Delivery</span><span>{(quote?.shipping ?? options.find(o => o.id === delivery)?.price) ? money(quote?.shipping ?? options.find(o => o.id === delivery)!.price) : 'Complimentary'}</span></div>
+        {!!quote?.giftCharge && <div className="summary-row"><span>{quote.giftBasket}</span><span>{money(quote.giftCharge)}</span></div>}
+        <div className="summary-row"><span>Delivery</span><span>{!quote || quote.needsPincode ? 'Enter pincode' : quote.shipping ? money(quote.shipping) : 'Complimentary'}</span></div>
         {!!quote?.tax && <div className="summary-row"><span>{quote.taxIncluded ? `Includes GST (${quote.taxRate}%)` : `GST (${quote.taxRate}%)`}</span><span>{money(quote.tax)}</span></div>}
         <div className="summary-row total"><span>Total</span><strong>{money(total)}</strong></div>
         <button className="button" type="submit" disabled={processing || blocked || !choices.length}>{processing ? 'Saving…' : label}<ArrowRight size={17} /></button>

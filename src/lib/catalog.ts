@@ -2,7 +2,7 @@
 export type Family = string;
 export type Product = {
   id: string; name: string; family: Family; mood: string; description: string;
-  image: string; price: number; color: string; notes: [string[], string[], string[]]; badge?: string;
+  image: string; /** More photos, after the main one. */ images?: string[]; price: number; color: string; notes: [string[], string[], string[]]; badge?: string;
   /** Selling price per size in ml, from the product's variants. Absent in the built-in defaults. */
   prices?: Record<number, number>;
   /** Tracked sizes with no stock left. */
@@ -32,11 +32,13 @@ export function fromPrice(p: Pick<Product, 'price' | 'prices'>) {
 }
 export const money = (n: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
 export const families: { name: Family; description: string; image: string; number: string }[] = [
-  { name: 'Oud', description: 'Rich. Bold. Unforgettable.', image: '/images/legacy.png', number: '01' },
-  { name: 'Floral', description: 'Grace in every unfolding.', image: '/images/aurora.png', number: '02' },
-  { name: 'Citrus', description: 'A brighter kind of energy.', image: '/images/citrus.png', number: '03' },
-  { name: 'Woody', description: 'Deep roots. Quiet warmth.', image: '/images/noir.png', number: '04' },
+  { name: 'Oud', description: 'Rich. Bold. Unforgettable.', image: '/images/family-oud.jpg', number: '01' },
+  { name: 'Floral', description: 'Grace in every unfolding.', image: '/images/family-floral.jpg', number: '02' },
+  { name: 'Citrus', description: 'A brighter kind of energy.', image: '/images/family-citrus.jpg', number: '03' },
+  { name: 'Woody', description: 'Deep roots. Quiet warmth.', image: '/images/family-woody.jpg', number: '04' },
 ];
+/** The general photo for a family's collection; the products inside show their own. */
+export const familyPhoto = (name: string) => [...families, { name: 'Musk', image: '/images/family-musk.jpg' }].find(f => f.name.toLowerCase() === name.toLowerCase())?.image;
 export const articles = [
   { slug: 'the-art-of-oud', title: 'The art of oud', category: 'INGREDIENT STORIES', image: '/images/legacy.png', excerpt: 'An introduction to the warm, woody note at the heart of Legacy.', body: ['Some notes announce themselves. Others draw you closer. Oud belongs to the latter: woody, textured, and wonderfully complex.', 'In the Legacy fragrance concept, oud sits alongside rose and jasmine, with saffron at the opening and amber in the base. The composition explores contrast: brightness and depth, softness and presence.', 'When discovering a new scent, give it time. Notice the first impression, return to it later, and find the part of its story that feels like yours.'] },
   { slug: 'find-your-signature', title: 'A scent that feels like you', category: 'THE FRAGRANCE GUIDE', image: '/images/aurora.png', excerpt: 'Let curiosity lead you to your next signature fragrance.', body: ['Your signature fragrance can begin with a feeling. The comfort of warm woods. The brightness of citrus. The softness of a favourite flower.', 'Explore one family at a time and pay attention to what draws you in. Our scent finder offers a starting point, with a small selection based on the mood and notes you enjoy.', 'There is no need to choose a scent for every occasion at once. Begin with one that feels natural, and let your collection grow with you.'] },

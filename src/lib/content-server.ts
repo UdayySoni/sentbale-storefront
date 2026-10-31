@@ -12,10 +12,10 @@ const slugify = (text: string) => text.toLowerCase().replace(/[^a-z0-9]+/g, '-')
 /** Everything the storefront shows that is edited in the admin, apart from products and images. */
 export async function readContent(): Promise<SiteContent> {
   const database = await db();
-  const [homepage, settings, collections, posts, reviews, methods] = await Promise.all([
+  const [homepage, settings, collections, posts, reviews, methods, baskets] = await Promise.all([
     setting('homepage', database), setting('settings', database),
     database.select().from(s.collections).orderBy(asc(s.collections.position)),
-    records('posts', database), records('reviews', database), records('methods', database),
+    records('posts', database), records('reviews', database), records('methods', database), records('baskets', database),
   ]);
   const used = new Set<string>();
   const published = posts.filter(p => p.status === 'Published').sort((a, b) => String(b.date).localeCompare(String(a.date))).map(p => {
@@ -29,9 +29,10 @@ export async function readContent(): Promise<SiteContent> {
   const content = {
     homepage,
     store: { name: settings.storeName || 'SENTBALE', email: settings.email, phone: settings.phone, address: settings.address },
-    collections: collections.filter(c => c.status !== 'Hidden').map(c => ({ id: c.id, name: c.name, description: c.description, featured: c.featured })),
+    collections: collections.filter(c => c.status !== 'Hidden').map(c => ({ id: c.id, name: c.name, description: c.description, image: c.image ?? '', featured: c.featured })),
     posts: published,
     reviews: reviews.filter(r => r.status === 'Published').map(r => ({ id: r.id, product: r.product, customer: r.customer, rating: Math.min(5, Math.max(1, Math.round(Number(r.rating) || 5))), title: r.title, body: r.body, date: r.date })),
+    baskets: baskets.filter(b => b.status === 'Active').map(b => ({ id: b.id, name: b.name, description: b.description, image: b.image ?? '', price: Number(b.price) || 0 })).sort((a, b) => a.price - b.price),
     payments: {
       online: razorpayEnabled(), test: testPaymentsEnabled(),
       cod: methods.some(m => m.status === 'Enabled' && (/^(cod|cash on delivery)$/i.test(String(m.name).trim()) || /cash on delivery/i.test(String(m.provider)))),

@@ -26,11 +26,11 @@ export async function readCatalog(): Promise<Catalog> {
   const variants = rows.length ? await database.select().from(s.productVariants).where(inArray(s.productVariants.productId, rows.map(r => r.id))).orderBy(asc(s.productVariants.size)) : [];
   return {
     revision: revision?.value ?? '0',
-    products: rows.flatMap(({ id, name, family, mood, description, image, price, color, notes, badge }) => {
+    products: rows.flatMap(({ id, name, family, mood, description, image, images, price, color, notes, badge }) => {
       const own = variants.filter(v => v.productId === id);
       if (!own.length) return [];
       return [{
-        id, name, family, mood, description, image, color, notes, ...(badge ? { badge } : {}),
+        id, name, family, mood, description, image, images, color, notes, ...(badge ? { badge } : {}),
         price: Math.min(price, ...own.map(v => v.price)),
         prices: Object.fromEntries(own.map(v => [v.size, v.price])),
         soldOut: own.filter(v => v.threshold > 0 && v.stock <= 0).map(v => v.size),

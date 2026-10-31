@@ -30,10 +30,15 @@ export function seed(): Db {
   return {
     version: DB_VERSION, roles,
     products: [], orders: [], customers: [], coupons: [], reviews: [], zones: [], partners: [], methods: [], team: [], audit: [], enquiries: [],
+    baskets: [
+      { id: 'classic', name: 'Classic basket', description: 'Woven basket with ribbon', image: '/images/basket-classic.jpg', price: 199, status: 'Active' },
+      { id: 'premium', name: 'Premium basket', description: 'Lined basket with satin bow', image: '/images/basket-premium.jpg', price: 499, status: 'Active' },
+      { id: 'luxury', name: 'Luxury hamper', description: 'Keepsake box with tissue and seal', image: '/images/basket-luxury.jpg', price: 999, status: 'Active' },
+    ],
     skus: liveProducts.flatMap(product => skusFor(product, 0)),
     collections: families.map((family, i) => ({ id: slug(family.name), name: family.name, description: family.description, position: i + 1, featured: false, status: 'Visible' as const })),
     posts: articles.map(article => ({ id: article.slug, title: article.title, category: article.category, excerpt: article.excerpt, body: article.body.join('\n\n'), author: 'SENTBALE Studio', status: 'Published' as const, date: now })),
-    homepage: { announcement: '', announcementOn: false, eyebrow: '', headline: 'More than a fragrance. A feeling.', subheadline: '', cta: 'Explore fragrances', ctaHref: '/shop', featured: '', showFinder: true, showJournal: true },
+    homepage: { announcement: '', announcementOn: false, eyebrow: '', headline: 'More than a fragrance. A feeling.', subheadline: '', cta: 'Explore fragrances', ctaHref: '/shop', featured: '', showFinder: true, showJournal: true, showGifts: true },
     settings: { storeName: 'SENTBALE', email: '', phone: '', address: '', gstin: '', gstRate: 18, pricesIncludeTax: true, invoicePrefix: 'SB-', lowStock: 10, notifyOrders: true, notifyLowStock: true, notifyReviews: false },
     seen: '',
   };
